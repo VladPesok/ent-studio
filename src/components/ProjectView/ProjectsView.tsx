@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Table, Input, Button, Dropdown, Space, MenuProps } from "antd";
 import {
   EllipsisOutlined,
   PlusOutlined,
   UsbOutlined,
+  FolderOpenOutlined,
 } from "@ant-design/icons";
 import AddCardModal from "./AddCardModal/AddCardModal";
 import RecordDetails from "../RecordDetails/RecordDetails";
 import type { ColumnsType } from "antd/es/table";
+import './ProjectsView.css'
 
 export interface Project {
   folder: string; //   Байрак_Андрій_1986-12-24
@@ -29,6 +31,22 @@ const ProjectsView: React.FC<Props> = ({ projects }) => {
   const [search,   setSearch]   = useState("");
   const [addOpen,  setAddOpen]  = useState(false);
 
+  const [meta, setMeta] = useState<Record<string, { doctor?:string; diagnosis?:string }>>({});
+
+useEffect(() => {
+  /* fetch minimal meta once for each project */
+  (async () => {
+    const next: typeof meta = {};
+    for (const p of projects) {
+      const cfg = await window.electronAPI.getPatient(p.folder); // {doctor, diagnosis…}
+      next[p.folder] = { doctor: cfg.doctor ?? "", diagnosis: cfg.diagnosis ?? "" };
+    }
+    setMeta(next);
+  })();
+}, [projects]);
+
+
+
   /* ---------------- filter + sort ---------------- */
   const data = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -45,7 +63,6 @@ const ProjectsView: React.FC<Props> = ({ projects }) => {
       .map((p) => ({ key: p.folder, ...p })); // AntD needs key
   }, [projects, search]);
 
-  /* ---------------- table columns ---------------- */
   const columns: ColumnsType<Project & { key: string }> = [
     {
       title: "Прізвище та ім’я",
@@ -53,29 +70,32 @@ const ProjectsView: React.FC<Props> = ({ projects }) => {
       key: "pn",
       render: (folder: string) => {
         const { surname, name } = splitName(folder);
-        return `${surname} ${name}`;
+        return <span className="patient-cell">{`${surname} ${name}`}</span>;
       },
-      sorter: (a, b) => {
-        const an = splitName(a.folder);
-        const bn = splitName(b.folder);
-        return an.surname.localeCompare(b.surname);
-      },
+      sorter: (a, b) => splitName(a.folder).surname.localeCompare(splitName(b.folder).surname),
     },
-    {
-      title: "Дата народження",
-      dataIndex: "folder",
-      key: "dob",
-      width: 150,
-      render: (folder: string) => splitName(folder).dob,
-    },
-    {
-      title: "Дата останнього прийому",
-      dataIndex: "date",
-      key: "visit",
-      width: 170,
-      sorter: (a, b) => (a.date > b.date ? -1 : 1),
+    { title: "Дата народження", dataIndex: "folder", key: "dob", width: 150,
+      render: (f) => splitName(f).dob },
+    { title: "Дата останнього прийому", dataIndex: "date", key: "visit", width: 170,
+      sorter: (a, b) => (a.date > b.date ? -1 : 1) },
+    { title: "Лікар", key: "doc", width: 160,
+      render: (_, r) => meta[r.folder]?.doctor ?? "" },
+    { title: "Діагноз", key: "diag",
+      render: (_, r) => meta[r.folder]?.diagnosis ?? "" },
+    { title: "Статус", key: "state", width: 100, render: () => <span className="state-pill">active</span> },
+    { title: "", key: "open", width: 50,
+      render: (_, r) => (
+        <FolderOpenOutlined
+          onClick={(e) => {
+            e.stopPropagation();
+            window.electronAPI.openPatientFolder(r.folder);
+          }}
+          style={{ cursor: "pointer", fontSize: 18 }}
+        />
+      ),
     },
   ];
+
 
   /* ---------------- dropdown actions ------------- */
   const items: MenuProps["items"] = [
@@ -126,15 +146,12 @@ const ProjectsView: React.FC<Props> = ({ projects }) => {
 
           <Input
             className="search-input"
+            
             placeholder="Пошук за іменем/прізвищем…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             allowClear
           />
-
-          <Dropdown menu={{ items }} trigger={["click"]}>
-            <Button icon={<EllipsisOutlined />} />
-          </Dropdown>
 
           <Button
             type="primary"
@@ -143,6 +160,10 @@ const ProjectsView: React.FC<Props> = ({ projects }) => {
           >
             Додати картку
           </Button>
+
+          <Dropdown menu={{ items }} trigger={["click"]}>
+            <Button icon={<EllipsisOutlined />} />
+          </Dropdown>
         </div>
 
         <Table
