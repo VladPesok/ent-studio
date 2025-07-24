@@ -34,12 +34,11 @@ export interface ElectronAPI {
 
   getPatient(folder: string): Promise<any>;
   setPatient(folder: string, data: unknown): Promise<void>;
-  getCounts(folder: string): Promise<{ videoCount: number; videoAudioCount: number }>;
-  getClips(folder: string): Promise<{ video: string[]; videoAudio: string[] }>;
-  addVoiceReport(folder: string): Promise<any>;
-  openVoiceDoc(folder: string, fileName: string): Promise<any>;
-  deleteVoiceDoc(folder: string, fileName: string): Promise<any>;
+  getCounts(folder: string): Promise<{ videoCount: number }>;
+  getClips(folder: string): Promise<{ video: string[] }>;
+  makePatient(folderBase:string, date:string): Promise<any>;
 }
+
 
 declare global {
   interface Window {
@@ -51,21 +50,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   scanUsb:       () => ipcRenderer.invoke("scanUsb"),
   getProjects:   () => ipcRenderer.invoke("getProjects"),
 
-  getDictionaries: () => ipcRenderer.invoke("dict:get"),
-  addDictionaryEntry: (type: DictionaryType, entry: string) =>
-    ipcRenderer.invoke("dict:add", type, entry),
+  getDictionaries:   () => ipcRenderer.invoke("dict:get"),
+  addDictionaryEntry:(t:DictionaryType,e:string)=>ipcRenderer.invoke("dict:add",t,e),
 
-  getPatient:  (folder: string)          => ipcRenderer.invoke("patient:get", folder),
-  setPatient:  (folder: string, data: unknown) =>
-    ipcRenderer.invoke("patient:set", folder, data),
+  getPatient: (f:string)              => ipcRenderer.invoke("patient:get", f),
+  setPatient: (f:string,d:any)        => ipcRenderer.invoke("patient:set", f, d),
 
-  getCounts:   (folder: string)          => ipcRenderer.invoke("patient:counts", folder),
-  getClips:    (folder: string)          => ipcRenderer.invoke("patient:clips", folder),
-  addVoiceReport: (folder: string) => ipcRenderer.invoke("voice:add", folder),
-  openVoiceDoc: (folder: string, fileName: string) => ipcRenderer.invoke("voice:open", folder, fileName),
-  deleteVoiceDoc: (folder: string, file: string) => ipcRenderer.invoke("voice:delete", folder, file)
+  getCounts:  (f:string)              => ipcRenderer.invoke("patient:counts", f),
+  getClips:   (f:string)              => ipcRenderer.invoke("patient:clips",  f),
+  makePatient: (folderBase:string, date:string) => ipcRenderer.invoke("patient:new", folderBase, date)
+
 } satisfies ElectronAPI);
-
 
 // --------- Preload scripts loading ---------
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {

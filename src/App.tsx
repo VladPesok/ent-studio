@@ -2,9 +2,9 @@ import React, { useEffect, useState } from "react";
 import "./App.css";
 import { scanUsb, getLocal, Project } from "./helpers/scanUsb";
 import ProjectsView from "./components/ProjectView/ProjectsView";
+import { ConfigProvider } from "antd";
 
 
-/* ───────────── Main component ───────────── */
 const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [scanning, setScanning] = useState(false);
@@ -18,34 +18,21 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <div className="app-container">
-      {/* Top bar */}
-      <header className="top-bar">
-        <h1>ENT Video Ingest</h1>
-        <button
-          className="scan-btn"
-          disabled={scanning}
-          onClick={async () => {
-            setScanning(true);
-            try {
-              const newProjects = await scanUsb();
-              if(newProjects.length){
-                setProjects([...projects, ...newProjects]);
-              }
-            } finally {
-              setScanning(false)
-            }
-          }}
-        >
-          Scan USB / Folder
-        </button>
-      </header>
+    <ConfigProvider
+      theme={{ token: { colorPrimary: "#2563eb" /* Tailwind indigo‑600 */ } }}
+    >
+      <div className="app-container">
+        {/* Top bar */}
+        <header className="top-bar">
+          <h1>ENT Video Ingest</h1>
+        </header>
 
-      {/* Project list */}
-      <main className="content">
-        <ProjectsView projects={projects}/>
-      </main>
-    </div>
+        {/* Project list */}
+        <main className="content">
+          <ProjectsView projects={projects}/>
+        </main>
+      </div>
+    </ConfigProvider>
   );
 };
 

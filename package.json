@@ -20,6 +20,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.0.0",
+    "antd": "^5.26.6",
     "electron-updater": "^6.3.9",
     "jszip": "^3.10.1",
     "mammoth": "^1.9.1",
