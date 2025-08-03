@@ -22,9 +22,11 @@
   "dependencies": {
     "@ant-design/icons": "^6.0.0",
     "antd": "^5.26.6",
+    "country-flag-icons": "^1.5.19",
     "electron-updater": "^6.3.9",
     "jszip": "^3.10.1",
     "mammoth": "^1.9.1",
+    "react-router-dom": "^7.7.1",
     "react-select": "^5.10.1"
   },
   "devDependencies": {

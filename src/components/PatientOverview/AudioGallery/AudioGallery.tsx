@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import "./AudioGallery.css";
 
 interface Props {
-  /** patient root folder (RecordDetails passes project.folder) */
+  /** patient root folder (PatientOverview passes project.folder) */
   baseFolder: string;
 }
 

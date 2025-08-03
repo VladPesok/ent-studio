@@ -3,7 +3,6 @@ import path, { extname } from "path";
 import type { App, Dialog, IpcMain } from "electron";
 import { shell } from "electron";
 
-/* ───────────────────────── helpers ───────────────────────── */
 export const makePatientsRoot = (app: App) =>
   path.join(app.getPath("userData"), "patients");
 
@@ -15,16 +14,11 @@ export const ensureDir = (dir: string) => fs.mkdir(dir, { recursive: true });
 export const exists = async (p: string) =>
   fs.access(p).then(() => true).catch(() => false);
 
-/* ───────────────────────── USB scan pattern ────────────────
-   USB folders come in the old form:
-   ПІБ_DOB_code_YYYY-MM-DD_hhmmss
-   We keep the regexp, just ignore “code” now.                */
+
 const USB_PATTERN =
   /^(.+?_\d{4}-\d{2}-\d{2})_(?:[^_]+)_(\d{4}-\d{2}-\d{2})_\d{6}$/;
-/* 1‑я группа → patientBase   (Фамилия_Имя_ДР)
-   2‑я        → recDate       (дата приёма)                   */
 
-/* ───────────────────────── low‑level copy ────────────────── */
+
 const copySession = async (
   patientsRoot: string,
   usbDir: string,
@@ -47,20 +41,17 @@ const copySession = async (
   const cfgFile = path.join(appointmentRoot, "data.cfg");
   if (!(await exists(cfgFile))) await fs.writeFile(cfgFile, "{}", "utf8");
 
-  /* don’t re‑copy if there’s already at least one clip */
   if ((await fs.readdir(videoDir)).some(isClip)) return;
 
-  /* copy everything from USB session into video/ */
   await fs.cp(usbDir, videoDir, { recursive: true, force: false });
 };
 
-/* ───────────────────────── build project cards ───────────── */
 const latestDate = async (patientRoot: string) => {
   const sub = await fs.readdir(patientRoot, { withFileTypes: true });
   return sub
     .filter((d) => d.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(d.name))
     .map((d) => d.name)
-    .sort()                // YYYY‑MM‑DD lexicographical sort = chronological
+    .sort()
     .pop() || "";
 };
 
@@ -70,13 +61,12 @@ const buildProjects = async (patientsRoot: string) => {
     dirs
       .filter((d) => d.isDirectory())
       .map(async (d) => ({
-        folder: d.name,          // patient root
-        date:   await latestDate(path.join(patientsRoot, d.name)), // last visit
+        folder: d.name,
+        date:   await latestDate(path.join(patientsRoot, d.name)),
       })),
   );
 };
 
-/* list clips from ONE appointment (latest if not given) */
 const listDirClips = async (dir: string) => {
   try {
     const ents = await fs.readdir(dir, { withFileTypes: true });
@@ -93,7 +83,6 @@ const latestAppointmentDir = async (patientsRoot: string, folder: string) => {
   return path.join(patientsRoot, folder, dates);
 };
 
-/* ───────────────────────── IPC registration ─────────────── */
 export const registerFsIpc = (
   app: App,
   ipc: IpcMain,
@@ -101,13 +90,11 @@ export const registerFsIpc = (
 ): void => {
   const patientsRoot = makePatientsRoot(app);
 
-  /* ensure base dir exists */
   ipc.handle("getProjects", async () => {
     await ensureDir(patientsRoot);
     return buildProjects(patientsRoot);
   });
 
-  /* ---------- scan USB & ingest ---------- */
   ipc.handle("scanUsb", async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openDirectory"],
@@ -125,8 +112,10 @@ export const registerFsIpc = (
     return buildProjects(patientsRoot);
   });
 
-  /* ---------- dictionaries (unchanged) ---------- */
+
+
   const appCfg = () => path.join(patientsRoot, "app.config");
+
   const ensureJson = async (file: string, init: any) => {
     try { await fs.access(file); }
     catch {
@@ -139,17 +128,25 @@ export const registerFsIpc = (
       return structuredClone(init);
     }
   };
+
   const saveJson = (file: string, data: any) =>
     fs.writeFile(file, JSON.stringify(data, null, 2), "utf8");
 
+  const DEFAULT_CFG = {
+    dictionaries: { doctors: [] as string[], diagnosis: [] as string[] },
+    settings    : { theme: "light" as "light" | "dark", locale: "en" as "en" | "ua" },
+    session     : { currentDoctor: null as string | null },
+  };
+
   ipc.handle("dict:get", async () => {
-    const cfg = await ensureJson(appCfg(), { dictionaries:{ doctors:[], diagnosis:[] }});
+    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
     return cfg.dictionaries;
   });
+
   ipc.handle(
     "dict:add",
     async (_e, type: "doctors" | "diagnosis", value: string) => {
-      const cfg = await ensureJson(appCfg(), { dictionaries:{ doctors:[], diagnosis:[] }});
+      const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
       if (!cfg.dictionaries[type].includes(value)) {
         cfg.dictionaries[type].push(value);
         await saveJson(appCfg(), cfg);
@@ -157,7 +154,27 @@ export const registerFsIpc = (
     },
   );
 
-  /* ---------- per‑appointment data ---------- */
+  ipc.handle("settings:get", async () => {
+    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    return cfg.settings;
+  });
+  ipc.handle("settings:set", async (_e, patch) => {
+    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    cfg.settings = { ...cfg.settings, ...patch };
+    await saveJson(appCfg(), cfg);
+  });
+
+  ipc.handle("session:get", async () => {
+    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    return cfg.session;
+  });
+  ipc.handle("session:set", async (_e, patch) => {
+    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    cfg.session = { ...cfg.session, ...patch };
+    await saveJson(appCfg(), cfg);
+  });
+
+
   const apptCfg = async (folder: string) => {
     const apptDir = await latestAppointmentDir(patientsRoot, folder);
     return path.join(apptDir, "data.cfg");
@@ -193,4 +210,12 @@ export const registerFsIpc = (
     await ensureDir(appt);
     await fs.writeFile(path.join(pRoot, date, "data.cfg"), "{}", "utf8");
   });
+
+  ipc.handle("patient:openFolder", async (_e, folder: string) => {
+    const dir = path.join(patientsRoot, folder);
+    return shell.openPath(dir);     // resolves to "" on success or error-string
+  });
+
 };
+
+

@@ -1,39 +1,82 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+} from "react-router-dom";
+import { ConfigProvider, Layout, theme as antTheme } from "antd";
+import enUS from "antd/locale/en_US";
+import ukUA from "antd/locale/uk_UA";
+
+import PatientsList    from "./components/PatientsList/PatientsList";
+import PatientOverview from "./components/PatientOverview/PatientOverview";
+import Settings        from "./components/Settings/Settings";
+
+import { AppConfigProvider, AppConfigContext } from "./holders/AppConfig";
+import AppHeader from "./wrappers/Header/Header";
+import AppSider  from "./wrappers/Sider/Sider";
+
 import "./App.css";
-import { scanUsb, getLocal, Project } from "./helpers/scanUsb";
-import ProjectsView from "./components/ProjectView/ProjectsView";
-import { ConfigProvider } from "antd";
 
+const { Content } = Layout;
+const { useToken } = antTheme;
 
-const App: React.FC = () => {
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [scanning, setScanning] = useState(false);
+const AppShell: React.FC = () => {
+  const { locale } = React.useContext(AppConfigContext);
+  const antdLocale = locale === "en" ? enUS : ukUA;
 
-    
-  useEffect(() => {
-    (async () => {
-      const existing = await getLocal();
-      setProjects(existing);
-    })();
-  }, []);
+  const [collapsed, setCollapsed] = useState(true);
+
+  const { token } = useToken();
 
   return (
     <ConfigProvider
-      theme={{ token: { colorPrimary: "#2563eb" /* Tailwind indigo‑600 */ } }}
+      locale={antdLocale}
+      theme={{
+        algorithm: antTheme.defaultAlgorithm,
+        token: { colorPrimary: "#2563eb" },
+      }}
     >
-      <div className="app-container">
-        {/* Top bar */}
-        <header className="top-bar">
-          <h1>ENT Video Ingest</h1>
-        </header>
-
-        {/* Project list */}
-        <main className="content">
-          <ProjectsView projects={projects}/>
-        </main>
-      </div>
+      <Layout style={{ minHeight: "100vh" }}>
+        <AppSider collapsed={collapsed} token={token} />
+        <Layout>
+          <AppHeader
+            collapsed={collapsed}
+            onToggle={() => setCollapsed(!collapsed)}
+            token={token}
+          />
+          <Content
+            style={{
+              margin: 24,
+              padding: 24,
+              background: token.colorBgContainer,
+            }}
+          >
+            <Routes>
+              <Route
+                path="/patients"
+                element={<PatientsList/>}
+              />
+              <Route path="/patients/:id" element={<PatientOverview />} />
+              <Route path="/settings"      element={<Settings />} />
+              <Route
+                path="*"
+                element={<PatientsList/>}
+              />
+            </Routes>
+          </Content>
+        </Layout>
+      </Layout>
     </ConfigProvider>
   );
 };
+
+const App: React.FC = () => (
+  <BrowserRouter>
+    <AppConfigProvider>
+      <AppShell />
+    </AppConfigProvider>
+  </BrowserRouter>
+);
 
 export default App;

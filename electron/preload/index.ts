@@ -1,6 +1,5 @@
 import { ipcRenderer, contextBridge } from 'electron'
 
-// --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
     const [channel, listener] = args
@@ -18,27 +17,34 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const [channel, ...omit] = args
     return ipcRenderer.invoke(channel, ...omit)
   },
-  
-  // You can expose other APTs you need here.
-  // ...
+
 })
 
 export type DictionaryType = "doctors" | "diagnosis";
 
 export interface ElectronAPI {
+  /* projects & USB */
   scanUsb(): Promise<any>;
   getProjects(): Promise<any>;
 
-  getDictionaries(): Promise<{ doctors: string[]; diagnosis: string[] }>;
-  addDictionaryEntry(type: DictionaryType, entry: string): Promise<void>;
-
+  /* appointment data */
   getPatient(folder: string): Promise<any>;
-  setPatient(folder: string, data: unknown): Promise<void>;
+  setPatient(folder: string, data: any): Promise<void>;
   getCounts(folder: string): Promise<{ videoCount: number }>;
   getClips(folder: string): Promise<{ video: string[] }>;
-  makePatient(folderBase:string, date:string): Promise<any>;
-}
+  makePatient(base: string, date: string): Promise<void>;
+  openPatientFolder(base: string): Promise<void>;
 
+  /* settings & session & dictionaries */
+  getSettings(): Promise<{ theme: "light" | "dark"; locale: "en" | "ua" }>;
+  setSettings(patch: Partial<{ theme: "light" | "dark"; locale: "en" | "ua" }>): Promise<void>;
+
+  getSession(): Promise<{ currentDoctor: string | null }>;
+  setSession(patch: Partial<{ currentDoctor: string | null }>): Promise<void>;
+
+  getDictionaries(): Promise<{ doctors: string[]; diagnosis: string[] }>;
+  addDictionaryEntry(type: DictionaryType, value: string): Promise<void>;
+}
 
 declare global {
   interface Window {
@@ -46,23 +52,32 @@ declare global {
   }
 }
 
+
 contextBridge.exposeInMainWorld("electronAPI", {
-  scanUsb:       () => ipcRenderer.invoke("scanUsb"),
-  getProjects:   () => ipcRenderer.invoke("getProjects"),
+  /* projects & USB */
+  scanUsb     : ()                => ipcRenderer.invoke("scanUsb"),
+  getProjects : ()                => ipcRenderer.invoke("getProjects"),
 
-  getDictionaries:   () => ipcRenderer.invoke("dict:get"),
-  addDictionaryEntry:(t:DictionaryType,e:string)=>ipcRenderer.invoke("dict:add",t,e),
+  /* appointment data */
+  getPatient : (f: string)         => ipcRenderer.invoke("patient:get",  f),
+  setPatient : (f: string, d: any) => ipcRenderer.invoke("patient:set",  f, d),
+  getCounts  : (f: string)         => ipcRenderer.invoke("patient:counts", f),
+  getClips   : (f: string)         => ipcRenderer.invoke("patient:clips",  f),
+  makePatient: (base: string, date: string) => ipcRenderer.invoke("patient:new", base, date),
 
-  getPatient: (f:string)              => ipcRenderer.invoke("patient:get", f),
-  setPatient: (f:string,d:any)        => ipcRenderer.invoke("patient:set", f, d),
+  openPatientFolder: (folder: string) => ipcRenderer.invoke("patient:openFolder", folder),
 
-  getCounts:  (f:string)              => ipcRenderer.invoke("patient:counts", f),
-  getClips:   (f:string)              => ipcRenderer.invoke("patient:clips",  f),
-  makePatient: (folderBase:string, date:string) => ipcRenderer.invoke("patient:new", folderBase, date)
+  /* settings & session & dictionaries */
+  getSettings: ()                 => ipcRenderer.invoke("settings:get"),
+  setSettings: (p: any)           => ipcRenderer.invoke("settings:set", p),
 
-} satisfies ElectronAPI);
+  getSession : ()                 => ipcRenderer.invoke("session:get"),
+  setSession : (p: any)           => ipcRenderer.invoke("session:set", p),
 
-// --------- Preload scripts loading ---------
+  getDictionaries  : ()                                   => ipcRenderer.invoke("dict:get"),
+  addDictionaryEntry: (t: DictionaryType, e: string)     => ipcRenderer.invoke("dict:add", t, e),
+});
+
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {
   return new Promise(resolve => {
     if (condition.includes(document.readyState)) {
