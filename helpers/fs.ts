@@ -37,8 +37,14 @@ const copySession = async (
   await ensureDir(videoDir);
   await ensureDir(voiceDir);
 
+  /* create patient.config in patient folder if it doesn't exist */
+  const patientConfigFile = path.join(patientRoot, "patient.config");
+  if (!(await exists(patientConfigFile))) {
+    await fs.writeFile(patientConfigFile, JSON.stringify({ doctor: "", diagnosis: "" }, null, 2), "utf8");
+  }
+
   /* cfg stub per appointment */
-  const cfgFile = path.join(appointmentRoot, "data.cfg");
+  const cfgFile = path.join(appointmentRoot, "appointment.config");
   if (!(await exists(cfgFile))) await fs.writeFile(cfgFile, "{}", "utf8");
 
   if ((await fs.readdir(videoDir)).some(isClip)) return;
@@ -136,6 +142,10 @@ export const registerFsIpc = (
     dictionaries: { doctors: [] as string[], diagnosis: [] as string[] },
     settings    : { theme: "light" as "light" | "dark", locale: "en" as "en" | "ua" },
     session     : { currentDoctor: null as string | null },
+    shownTabs   : [
+      { name: "video_materials", folder: "video" },
+      { name: "voice_report", folder: "audio" }
+    ] as { name: string; folder: string }[],
   };
 
   ipc.handle("dict:get", async () => {
@@ -174,12 +184,37 @@ export const registerFsIpc = (
     await saveJson(appCfg(), cfg);
   });
 
+  ipc.handle("shownTabs:get", async () => {
+    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    return cfg.shownTabs;
+  });
+  ipc.handle("shownTabs:set", async (_e, tabs) => {
+    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    cfg.shownTabs = tabs;
+    await saveJson(appCfg(), cfg);
+  });
+
+
+  const patientCfg = (folder: string) => {
+    return path.join(patientsRoot, folder, "patient.config");
+  };
 
   const apptCfg = async (folder: string) => {
     const apptDir = await latestAppointmentDir(patientsRoot, folder);
-    return path.join(apptDir, "data.cfg");
+    return path.join(apptDir, "appointment.config");
   };
 
+  // Patient-level config (main doctor/diagnosis)
+  ipc.handle("patient:getMeta", async (_e, folder: string) =>
+    ensureJson(patientCfg(folder), { doctor: "", diagnosis: "" }),
+  );
+  ipc.handle("patient:setMeta", async (_e, folder: string, data: any) => {
+    const file = patientCfg(folder);
+    const cur = await ensureJson(file, {});
+    await saveJson(file, { ...cur, ...data });
+  });
+
+  // Appointment-level config (appointment-specific data)
   ipc.handle("patient:get", async (_e, folder: string) =>
     ensureJson(await apptCfg(folder), { doctor:"", diagnosis:"", notes:"" }),
   );
@@ -187,6 +222,33 @@ export const registerFsIpc = (
     const file = await apptCfg(folder);
     const cur  = await ensureJson(file, {});
     await saveJson(file, { ...cur, ...data });
+  });
+
+  ipc.handle("patient:appointments", async (_e, folder: string) => {
+    const patientRoot = path.join(patientsRoot, folder);
+    try {
+      const entries = await fs.readdir(patientRoot, { withFileTypes: true });
+      const appointments = [];
+      
+      for (const entry of entries) {
+        if (entry.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(entry.name)) {
+          const appointmentDir = path.join(patientRoot, entry.name);
+          const configFile = path.join(appointmentDir, "appointment.config");
+          const config = await ensureJson(configFile, { doctor: "", diagnosis: "", notes: "" });
+          
+          appointments.push({
+            date: entry.name,
+            doctor: config.doctor || "",
+            diagnosis: config.diagnosis || ""
+          });
+        }
+      }
+      
+      // Sort appointments by date (newest first)
+      return appointments.sort((a, b) => b.date.localeCompare(a.date));
+    } catch {
+      return [];
+    }
   });
 
   /* ---------- live counts & clips ---------- */
@@ -208,7 +270,15 @@ export const registerFsIpc = (
     const pRoot = path.join(patientsRoot, base);
     const appt  = path.join(pRoot, date, "video");
     await ensureDir(appt);
-    await fs.writeFile(path.join(pRoot, date, "data.cfg"), "{}", "utf8");
+    
+    // Create patient.config in patient folder
+    const patientConfigFile = path.join(pRoot, "patient.config");
+    if (!(await exists(patientConfigFile))) {
+      await fs.writeFile(patientConfigFile, JSON.stringify({ doctor: "", diagnosis: "" }, null, 2), "utf8");
+    }
+    
+    // Create appointment.config in appointment folder
+    await fs.writeFile(path.join(pRoot, date, "appointment.config"), "{}", "utf8");
   });
 
   ipc.handle("patient:openFolder", async (_e, folder: string) => {

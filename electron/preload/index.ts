@@ -30,10 +30,13 @@ export interface ElectronAPI {
   /* appointment data */
   getPatient(folder: string): Promise<any>;
   setPatient(folder: string, data: any): Promise<void>;
+  getPatientMeta(folder: string): Promise<{ doctor: string; diagnosis: string }>;
+  setPatientMeta(folder: string, data: { doctor?: string; diagnosis?: string }): Promise<void>;
+  getPatientAppointments(folder: string): Promise<{ date: string; doctor: string; diagnosis: string }[]>;
   getCounts(folder: string): Promise<{ videoCount: number }>;
   getClips(folder: string): Promise<{ video: string[] }>;
   makePatient(base: string, date: string): Promise<void>;
-  openPatientFolder(base: string): Promise<void>;
+  openPatientFolderInFs(base: string): Promise<void>;
 
   /* settings & session & dictionaries */
   getSettings(): Promise<{ theme: "light" | "dark"; locale: "en" | "ua" }>;
@@ -41,6 +44,9 @@ export interface ElectronAPI {
 
   getSession(): Promise<{ currentDoctor: string | null }>;
   setSession(patch: Partial<{ currentDoctor: string | null }>): Promise<void>;
+
+  getShownTabs(): Promise<{ name: string; folder: string }[]>;
+  setShownTabs(tabs: { name: string; folder: string }[]): Promise<void>;
 
   getDictionaries(): Promise<{ doctors: string[]; diagnosis: string[] }>;
   addDictionaryEntry(type: DictionaryType, value: string): Promise<void>;
@@ -61,11 +67,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   /* appointment data */
   getPatient : (f: string)         => ipcRenderer.invoke("patient:get",  f),
   setPatient : (f: string, d: any) => ipcRenderer.invoke("patient:set",  f, d),
+  getPatientMeta : (f: string)     => ipcRenderer.invoke("patient:getMeta", f),
+  setPatientMeta : (f: string, d: any) => ipcRenderer.invoke("patient:setMeta", f, d),
+  getPatientAppointments: (f: string) => ipcRenderer.invoke("patient:appointments", f),
   getCounts  : (f: string)         => ipcRenderer.invoke("patient:counts", f),
   getClips   : (f: string)         => ipcRenderer.invoke("patient:clips",  f),
   makePatient: (base: string, date: string) => ipcRenderer.invoke("patient:new", base, date),
 
-  openPatientFolder: (folder: string) => ipcRenderer.invoke("patient:openFolder", folder),
+  openPatientFolderInFs: (folder: string) => ipcRenderer.invoke("patient:openFolder", folder),
 
   /* settings & session & dictionaries */
   getSettings: ()                 => ipcRenderer.invoke("settings:get"),
@@ -73,6 +82,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   getSession : ()                 => ipcRenderer.invoke("session:get"),
   setSession : (p: any)           => ipcRenderer.invoke("session:set", p),
+
+  getShownTabs: ()                => ipcRenderer.invoke("shownTabs:get"),
+  setShownTabs: (tabs: any)       => ipcRenderer.invoke("shownTabs:set", tabs),
 
   getDictionaries  : ()                                   => ipcRenderer.invoke("dict:get"),
   addDictionaryEntry: (t: DictionaryType, e: string)     => ipcRenderer.invoke("dict:add", t, e),

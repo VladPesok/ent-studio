@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect } from "react";
-import { Table, Input, Button, Dropdown, Space, MenuProps } from "antd";
+import { Table, Input, Button, Dropdown, theme as antTheme, MenuProps } from "antd";
 import {
   EllipsisOutlined,
   PlusOutlined,
@@ -12,37 +12,38 @@ import type { ColumnsType } from "antd/es/table";
 import * as patientsApi from "../../helpers/patientsApi";
 import "./PatientsList.css";
 
+const { useToken } = antTheme;
+
 export const splitName = (folder: string) => {
   const [surname = "", name = "", dob = ""] = folder.split("_");
   return { surname, name, dob };
 };
 
 const PatientsList: React.FC = () => {
-  /* ---------------- local state ---------------- */
   const [patients, setPatients] = useState<patientsApi.Patient[]>([]);
-  const [meta,     setMeta]     = useState<Record<string, { doctor?: string; diagnosis?: string }>>({});
-  const [search,   setSearch]   = useState("");
-  const [addOpen,  setAddOpen]  = useState(false);
+  const [meta, setMeta] = useState<Record<string, { doctor?: string; diagnosis?: string }>>({});
+  const [search, setSearch] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
 
   const nav = useNavigate();
+  const { token } = useToken();
 
-  /* ---------------- initial / reload ------------ */
   const reloadPatients = async () => {
     const list = await patientsApi.getPatients();
     setPatients(list);
 
-    /* grab lightweight metadata for each */
     const next: typeof meta = {};
     for (const p of list) {
-      const cfg = await patientsApi.getPatientMeta(p.folder);
+      const cfg = await patientsApi.getPatientMainMeta(p.folder);
       next[p.folder] = { doctor: cfg?.doctor ?? "", diagnosis: cfg?.diagnosis ?? "" };
     }
     setMeta(next);
   };
 
-  useEffect(() => { reloadPatients(); }, []);
+  useEffect(() => {
+    reloadPatients();
+  }, []);
 
-  /* ---------------- filter + sort ---------------- */
   const data = useMemo(() => {
     const term = search.trim().toLowerCase();
     return patients
@@ -55,10 +56,8 @@ const PatientsList: React.FC = () => {
         );
       })
       .sort((a, b) => (a.date < b.date ? 1 : -1))
-      .map((p) => ({ key: p.folder, ...p })); // AntD needs key
+      .map((p) => ({ key: p.folder, ...p }));
   }, [patients, search]);
-
-  /* ---------------- table columns ---------------- */
   const columns: ColumnsType<patientsApi.Patient & { key: string }> = [
     {
       title: "Прізвище та ім’я",
@@ -82,7 +81,7 @@ const PatientsList: React.FC = () => {
       title: "Дата останнього прийому",
       dataIndex: "date",
       key: "visit",
-      width: 170,
+      width: 230,
       sorter: (a, b) => (a.date > b.date ? -1 : 1),
     },
     {
@@ -110,7 +109,7 @@ const PatientsList: React.FC = () => {
         <FolderOpenOutlined
           onClick={(e) => {
             e.stopPropagation();
-            patientsApi.openPatientFolder(r.folder);
+            patientsApi.openPatientFolderInFs(r.folder);
           }}
           style={{ cursor: "pointer", fontSize: 18 }}
         />
@@ -118,7 +117,6 @@ const PatientsList: React.FC = () => {
     },
   ];
 
-  /* ---------------- dropdown actions ------------- */
   const items: MenuProps["items"] = [
     {
       key: "usb",
@@ -131,16 +129,11 @@ const PatientsList: React.FC = () => {
     },
   ];
 
-  /* ---------------- add modal -------------------- */
   const handleAdd = async (folderBase: string, date: string) => {
     await patientsApi.makePatient(folderBase, date);
     setAddOpen(false);
     reloadPatients();
   };
-
-  /* ---------------- render ----------------------- */
-  if (!patients.length)
-    return <p className="empty-msg">Поки немає доданих пацієнтів</p>;
 
   return (
     <>
@@ -149,39 +142,51 @@ const PatientsList: React.FC = () => {
       )}
 
       <div className="project-view">
-        <div className="title-row">
-          <h2>Пацієнти</h2>
+        <div style={{
+              margin: 24,
+              padding: 24,
+              background: token.colorBgContainer,
+            }}>
+          <div className="title-row">
+            <div className="title-left">
+              <h2>Пацієнти</h2>
+              <Input
+                className="search-input"
+                placeholder="Пошук за іменем/прізвищем…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                allowClear
+              />
+            </div>
+            
+            <div className="title-right">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setAddOpen(true)}
+              >
+                Додати картку
+              </Button>
 
-          <Input
-            className="search-input"
-            placeholder="Пошук за іменем/прізвищем…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            allowClear
+              <Dropdown menu={{ items }} trigger={["click"]}>
+                <Button icon={<EllipsisOutlined />} />
+              </Dropdown>
+            </div>
+          </div>
+
+          <Table
+            columns={columns}
+            dataSource={data}
+            pagination={{ pageSize: 10 }}
+            onRow={(record) => ({
+              onClick: () => nav(`/patients/${record.folder}`),
+            })}
+            rowClassName="patient-row"
+            locale={{
+              emptyText: "Поки немає доданих пацієнтів"
+            }}
           />
-
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setAddOpen(true)}
-          >
-            Додати картку
-          </Button>
-
-          <Dropdown menu={{ items }} trigger={["click"]}>
-            <Button icon={<EllipsisOutlined />} />
-          </Dropdown>
         </div>
-
-        <Table
-          columns={columns}
-          dataSource={data}
-          pagination={{ pageSize: 10 }}
-          onRow={(record) => ({
-            onClick: () => nav(`/patients/${record.folder}`),   // ← redirect
-          })}
-          rowClassName="patient-row"
-        />
       </div>
     </>
   );

@@ -1,46 +1,48 @@
 import React from "react";
 import { Layout, Menu } from "antd";
-import {
-  UserOutlined,
-  SettingOutlined,
-} from "@ant-design/icons";
+import { UserOutlined, SettingOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
-import { theme as antTheme } from "antd";
 
 interface Props {
   collapsed: boolean;
-  token: ReturnType<typeof antTheme.useToken>["token"];
 }
 
-const AppSider: React.FC<Props> = ({ collapsed, token }) => {
+export const AppSider: React.FC<Props> = ({ collapsed }) => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const selectedMenu = location.pathname.startsWith("/settings")
-    ? "settings"
-    : "patients";
+  // Only show navigation menu on main pages, not in patient overview
+  const isPatientOverview = location.pathname.startsWith('/patient/');
+
+  if (isPatientOverview) {
+    return null; // Don't render sider in patient overview
+  }
+
+  const menuItems = [
+    {
+      key: "/",
+      icon: <UserOutlined />,
+      label: "Patients",
+    },
+    {
+      key: "/settings",
+      icon: <SettingOutlined />,
+      label: "Settings",
+    },
+  ];
 
   return (
-    <Layout.Sider
+    <Layout.Sider 
+      theme="light" 
+      width={200} 
       collapsed={collapsed}
-      width={200}
-      trigger={null}
-      theme="light"
-      style={{ background: token.colorBgContainer }}
     >
       <Menu
         mode="inline"
-        selectedKeys={[selectedMenu]}
-        onClick={({ key }) =>
-          navigate(key === "patients" ? "/patients" : "/settings")
-        }
-        items={[
-          { key: "patients", icon: <UserOutlined />,    label: "Patients" },
-          { key: "settings", icon: <SettingOutlined />, label: "Settings" },
-        ]}
+        selectedKeys={[location.pathname]}
+        items={menuItems}
+        onSelect={({ key }) => navigate(key)}
       />
     </Layout.Sider>
   );
 };
-
-export default AppSider;

@@ -7,6 +7,7 @@ import {
 import { ConfigProvider, Layout, theme as antTheme } from "antd";
 import enUS from "antd/locale/en_US";
 import ukUA from "antd/locale/uk_UA";
+import { useTranslation } from 'react-i18next';
 
 import PatientsList    from "./components/PatientsList/PatientsList";
 import PatientOverview from "./components/PatientOverview/PatientOverview";
@@ -14,8 +15,9 @@ import Settings        from "./components/Settings/Settings";
 
 import { AppConfigProvider, AppConfigContext } from "./holders/AppConfig";
 import AppHeader from "./wrappers/Header/Header";
-import AppSider  from "./wrappers/Sider/Sider";
+import { AppSider } from "./wrappers/Sider/Sider";
 
+import "./i18n";
 import "./App.css";
 
 const { Content } = Layout;
@@ -23,11 +25,17 @@ const { useToken } = antTheme;
 
 const AppShell: React.FC = () => {
   const { locale } = React.useContext(AppConfigContext);
+  const { i18n } = useTranslation();
   const antdLocale = locale === "en" ? enUS : ukUA;
 
   const [collapsed, setCollapsed] = useState(true);
 
   const { token } = useToken();
+
+  // Sync i18n language with app locale
+  useEffect(() => {
+    i18n.changeLanguage(locale);
+  }, [locale, i18n]);
 
   return (
     <ConfigProvider
@@ -38,20 +46,14 @@ const AppShell: React.FC = () => {
       }}
     >
       <Layout style={{ minHeight: "100vh" }}>
-        <AppSider collapsed={collapsed} token={token} />
+        <AppSider collapsed={collapsed} />
         <Layout>
           <AppHeader
             collapsed={collapsed}
             onToggle={() => setCollapsed(!collapsed)}
             token={token}
           />
-          <Content
-            style={{
-              margin: 24,
-              padding: 24,
-              background: token.colorBgContainer,
-            }}
-          >
+          <Content>
             <Routes>
               <Route
                 path="/patients"
