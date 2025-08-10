@@ -4,14 +4,14 @@ import { initReactI18next } from 'react-i18next';
 const resources = {
   en: {
     translation: {
-      'Відео матеріали': 'Video Materials',
-      'Голосовий звіт': 'Voice Report'
+      'video': 'Video Materials',
+      'audio': 'Voice Report'
     }
   },
   ua: {
     translation: {
-      'Відео матеріали': 'Відео матеріали',
-      'Голосовий звіт': 'Голосовий звіт'
+      'video': 'Відео матеріали',
+      'audio': 'Голосовий звіт'
     }
   }
 };

@@ -104,8 +104,7 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
       open
       title={
         <div className="modal-header">
-          <UserOutlined className="modal-icon" />
-          <Title level={4} style={{ margin: 0, color: 'white' }}>
+          <Title level={4} style={{ margin: 0 }}>
             Нова картка пацієнта
           </Title>
         </div>

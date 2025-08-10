@@ -66,10 +66,24 @@ const buildProjects = async (patientsRoot: string) => {
   return Promise.all(
     dirs
       .filter((d) => d.isDirectory())
-      .map(async (d) => ({
-        folder: d.name,
-        date:   await latestDate(path.join(patientsRoot, d.name)),
-      })),
+      .map(async (d) => {
+        const patientConfigFile = path.join(patientsRoot, d.name, "patient.config");
+        let patientConfig = { doctor: "", diagnosis: "" };
+        
+        try {
+          const configContent = await fs.readFile(patientConfigFile, "utf8");
+          patientConfig = { ...patientConfig, ...JSON.parse(configContent) };
+        } catch {
+          // If patient.config doesn't exist or is invalid, use defaults
+        }
+        
+        return {
+          folder: d.name,
+          date: await latestDate(path.join(patientsRoot, d.name)),
+          doctor: patientConfig.doctor || "",
+          diagnosis: patientConfig.diagnosis || ""
+        };
+      }),
   );
 };
 
@@ -194,14 +208,8 @@ export const registerFsIpc = (
     await saveJson(appCfg(), cfg);
   });
 
-
   const patientCfg = (folder: string) => {
     return path.join(patientsRoot, folder, "patient.config");
-  };
-
-  const apptCfg = async (folder: string) => {
-    const apptDir = await latestAppointmentDir(patientsRoot, folder);
-    return path.join(apptDir, "appointment.config");
   };
 
   // Patient-level config (main doctor/diagnosis)
@@ -214,15 +222,7 @@ export const registerFsIpc = (
     await saveJson(file, { ...cur, ...data });
   });
 
-  // Appointment-level config (appointment-specific data)
-  ipc.handle("patient:get", async (_e, folder: string) =>
-    ensureJson(await apptCfg(folder), { doctor:"", diagnosis:"", notes:"" }),
-  );
-  ipc.handle("patient:set", async (_e, folder: string, data: any) => {
-    const file = await apptCfg(folder);
-    const cur  = await ensureJson(file, {});
-    await saveJson(file, { ...cur, ...data });
-  });
+
 
   ipc.handle("patient:appointments", async (_e, folder: string) => {
     const patientRoot = path.join(patientsRoot, folder);
@@ -249,6 +249,19 @@ export const registerFsIpc = (
     } catch {
       return [];
     }
+  });
+
+  // Get appointment-specific data from appointment.config
+  ipc.handle("patient:getAppointment", async (_e, appointmentPath: string) => {
+    const configFile = path.join(patientsRoot, appointmentPath, "appointment.config");
+    return ensureJson(configFile, { doctor: "", diagnosis: "", notes: "" });
+  });
+
+  // Save appointment-specific data to appointment.config
+  ipc.handle("patient:setAppointment", async (_e, appointmentPath: string, data: any) => {
+    const configFile = path.join(patientsRoot, appointmentPath, "appointment.config");
+    const cur = await ensureJson(configFile, { doctor: "", diagnosis: "", notes: "" });
+    await saveJson(configFile, { ...cur, ...data });
   });
 
   /* ---------- live counts & clips ---------- */
@@ -284,6 +297,323 @@ export const registerFsIpc = (
   ipc.handle("patient:openFolder", async (_e, folder: string) => {
     const dir = path.join(patientsRoot, folder);
     return shell.openPath(dir);     // resolves to "" on success or error-string
+  });
+
+  // Enhanced clips with pagination and audio detection
+  ipc.handle("patient:clipsDetailed", async (_e, folder: string, offset: number = 0, limit: number = 12) => {
+    const apptDir = await latestAppointmentDir(patientsRoot, folder);
+    const videoDir = path.join(apptDir, "video");
+    const allClips = await listDirClips(videoDir);
+    
+    const paginatedClips = allClips.slice(offset, offset + limit);
+    const detailedClips = await Promise.all(
+      paginatedClips.map(async (filePath) => {
+        const ext = extname(filePath).toLowerCase();
+        const fileName = path.basename(filePath);
+        const stats = await fs.stat(filePath);
+        
+        // Determine file type and audio capability
+        let fileType = 'video';
+        let hasAudio = true;
+        
+        return {
+          url: `file://${filePath}`,
+          fileName,
+          fileType,
+          hasAudio,
+          size: stats.size,
+          modified: stats.mtime,
+          extension: ext
+        };
+      })
+    );
+    
+    return {
+      clips: detailedClips,
+      total: allClips.length,
+      hasMore: offset + limit < allClips.length
+    };
+  });
+
+  // Load more videos from external sources
+  ipc.handle("patient:loadMoreVideos", async (_e, folder: string) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        { name: "Video Files", extensions: ["mp4", "avi"] },
+        { name: "All Files", extensions: ["*"] }
+      ]
+    });
+    
+    if (canceled || !filePaths.length) return { success: false, count: 0 };
+    
+    const apptDir = await latestAppointmentDir(patientsRoot, folder);
+    const videoDir = path.join(apptDir, "video");
+    await ensureDir(videoDir);
+    
+    let copiedCount = 0;
+    for (const filePath of filePaths) {
+      const fileName = path.basename(filePath);
+      const destPath = path.join(videoDir, fileName);
+      
+      try {
+        // Check if file already exists
+        if (!(await exists(destPath))) {
+          await fs.copyFile(filePath, destPath);
+          copiedCount++;
+        }
+      } catch (error) {
+        console.error(`Failed to copy ${fileName}:`, error);
+      }
+    }
+    
+    return { success: true, count: copiedCount };
+  });
+
+  // CustomTab file operations
+  ipc.handle("getCustomTabFiles", async (_e, folder: string, tabFolder: string, currentAppointment?: string) => {
+    let targetDir: string;
+    
+    if (currentAppointment) {
+      targetDir = path.join(patientsRoot, folder, currentAppointment, tabFolder);
+    } else {
+      targetDir = path.join(patientsRoot, folder, tabFolder);
+    }
+    
+    try {
+      await ensureDir(targetDir);
+      const entries = await fs.readdir(targetDir, { withFileTypes: true });
+      
+      const files = await Promise.all(
+        entries
+          .filter(entry => entry.isFile())
+          .map(async (entry) => {
+            const filePath = path.join(targetDir, entry.name);
+            const stats = await fs.stat(filePath);
+            const ext = extname(entry.name).toLowerCase();
+            
+            return {
+              name: entry.name,
+              path: filePath,
+              size: stats.size,
+              extension: ext,
+              modified: stats.mtime
+            };
+          })
+      );
+      
+      return files.sort((a, b) => b.modified.getTime() - a.modified.getTime());
+    } catch (error) {
+      console.error('Error loading custom tab files:', error);
+      return [];
+    }
+  });
+
+  ipc.handle("selectAndCopyFiles", async (_e, folder: string, tabFolder: string, currentAppointment?: string) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        { name: "All Files", extensions: ["*"] }
+      ]
+    });
+    
+    if (canceled || !filePaths.length) return { success: false, count: 0 };
+    
+    let targetDir: string;
+    if (currentAppointment) {
+      targetDir = path.join(patientsRoot, folder, currentAppointment, tabFolder);
+    } else {
+      targetDir = path.join(patientsRoot, folder, tabFolder);
+    }
+    
+    await ensureDir(targetDir);
+    
+    let copiedCount = 0;
+    for (const filePath of filePaths) {
+      const fileName = path.basename(filePath);
+      const destPath = path.join(targetDir, fileName);
+      
+      try {
+        // Check if file already exists
+        if (!(await exists(destPath))) {
+          await fs.copyFile(filePath, destPath);
+          copiedCount++;
+        }
+      } catch (error) {
+        console.error(`Failed to copy ${fileName}:`, error);
+      }
+    }
+    
+    return { success: true, count: copiedCount };
+  });
+
+  ipc.handle("openFileInDefaultApp", async (_e, filePath: string) => {
+    try {
+      const result = await shell.openPath(filePath);
+      if (result === "") {
+        return { success: true, error: null };
+      } else {
+        // If opening file failed, try opening the folder containing the file
+        console.log('Failed to open file, trying to open folder:', result);
+        const folderPath = path.dirname(filePath);
+        const folderResult = await shell.openPath(folderPath);
+        return { 
+          success: folderResult === "", 
+          error: folderResult === "" ? null : folderResult,
+          fallbackUsed: true 
+        };
+      }
+    } catch (error) {
+      console.error('Error opening file:', error);
+      // Try opening the folder as fallback
+      try {
+        const folderPath = path.dirname(filePath);
+        const folderResult = await shell.openPath(folderPath);
+        return { 
+          success: folderResult === "", 
+          error: folderResult === "" ? null : folderResult,
+          fallbackUsed: true 
+        };
+      } catch (fallbackError) {
+        return { 
+          success: false, 
+          error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError) 
+        };
+      }
+    }
+  });
+
+  // Audio file operations
+  ipc.handle("patient:audioFiles", async (_e, folder: string, currentAppointment?: string) => {
+    let audioDir: string;
+    
+    if (currentAppointment) {
+      audioDir = path.join(patientsRoot, folder, currentAppointment, "audio");
+    } else {
+      const apptDir = await latestAppointmentDir(patientsRoot, folder);
+      audioDir = path.join(apptDir, "audio");
+    }
+    
+    try {
+      await ensureDir(audioDir);
+      const entries = await fs.readdir(audioDir, { withFileTypes: true });
+      
+      const audioExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.wma', '.webm', '.mp4'];
+      
+      const files = await Promise.all(
+        entries
+          .filter(entry => entry.isFile())
+          .filter(entry => {
+            const ext = extname(entry.name).toLowerCase();
+            return audioExtensions.includes(ext);
+          })
+          .map(async (entry) => {
+            const filePath = path.join(audioDir, entry.name);
+            const stats = await fs.stat(filePath);
+            const ext = extname(entry.name).toLowerCase();
+            
+            return {
+              url: `file://${filePath}`,
+              fileName: entry.name,
+              path: filePath,
+              size: stats.size,
+              extension: ext,
+              modified: stats.mtime,
+              fileType: 'audio'
+            };
+          })
+      );
+      
+      return files.sort((a, b) => b.modified.getTime() - a.modified.getTime());
+    } catch (error) {
+      console.error('Error loading audio files:', error);
+      return [];
+    }
+  });
+
+  ipc.handle("patient:loadMoreAudio", async (_e, folder: string, currentAppointment?: string) => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        { name: "Audio Files", extensions: ["mp3", "wav", "m4a", "aac", "ogg", "flac", "wma", "webm", "mp4"] },
+        { name: "All Files", extensions: ["*"] }
+      ]
+    });
+    
+    if (canceled || !filePaths.length) return { success: false, count: 0 };
+    
+    let audioDir: string;
+    if (currentAppointment) {
+      audioDir = path.join(patientsRoot, folder, currentAppointment, "audio");
+    } else {
+      const apptDir = await latestAppointmentDir(patientsRoot, folder);
+      audioDir = path.join(apptDir, "audio");
+    }
+    
+    await ensureDir(audioDir);
+    
+    let copiedCount = 0;
+    for (const filePath of filePaths) {
+      const fileName = path.basename(filePath);
+      const destPath = path.join(audioDir, fileName);
+      
+      try {
+        // Check if file already exists
+        if (!(await exists(destPath))) {
+          await fs.copyFile(filePath, destPath);
+          copiedCount++;
+        }
+      } catch (error) {
+        console.error(`Failed to copy ${fileName}:`, error);
+      }
+    }
+    
+    return { success: true, count: copiedCount };
+  });
+
+  ipc.handle("patient:openAudioFolder", async (_e, folder: string, currentAppointment?: string) => {
+    let audioDir: string;
+    
+    if (currentAppointment) {
+      audioDir = path.join(patientsRoot, folder, currentAppointment, "audio");
+    } else {
+      const apptDir = await latestAppointmentDir(patientsRoot, folder);
+      audioDir = path.join(apptDir, "audio");
+    }
+    
+    await ensureDir(audioDir);
+    return shell.openPath(audioDir);
+  });
+
+  ipc.handle("patient:saveRecordedAudio", async (_e, folder: string, currentAppointment: string | undefined, audioBuffer: ArrayBuffer, filename: string) => {
+    try {
+      let audioDir: string;
+      
+      if (currentAppointment) {
+        audioDir = path.join(patientsRoot, folder, currentAppointment, "audio");
+      } else {
+        const apptDir = await latestAppointmentDir(patientsRoot, folder);
+        audioDir = path.join(apptDir, "audio");
+      }
+      
+      await ensureDir(audioDir);
+      
+      // Ensure filename has a valid audio extension, default to .wav
+      const supportedExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.wma', '.webm', '.mp4'];
+      const hasValidExtension = supportedExtensions.some(ext => filename.toLowerCase().endsWith(ext));
+      
+      const finalFilename = hasValidExtension ? filename : `${filename}.wav`;
+      const filePath = path.join(audioDir, finalFilename);
+      
+      // Convert ArrayBuffer to Buffer and save
+      const buffer = Buffer.from(audioBuffer);
+      await fs.writeFile(filePath, buffer);
+      
+      return { success: true, filePath };
+    } catch (error) {
+      console.error('Error saving recorded audio:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
   });
 
 };

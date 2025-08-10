@@ -1,0 +1,199 @@
+/* Record Audio Modal */
+.record-audio-modal .ant-modal-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 24px;
+}
+
+.record-modal-title {
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.record-modal-content {
+  padding: 24px 0;
+}
+
+/* Device Selection */
+.device-selection {
+  margin-bottom: 24px;
+}
+
+.device-selection .ant-typography {
+  color: #262626;
+  font-size: 14px;
+}
+
+/* Filename Input */
+.filename-input {
+  margin-bottom: 32px;
+}
+
+.filename-input .ant-typography {
+  color: #262626;
+  font-size: 14px;
+}
+
+/* Recording Controls */
+.recording-controls {
+  text-align: center;
+  margin-bottom: 32px;
+  padding: 24px;
+  background: #fafafa;
+  border-radius: 12px;
+  border: 2px dashed #d9d9d9;
+}
+
+.recording-status {
+  margin-bottom: 24px;
+}
+
+.recording-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.recording-dot {
+  width: 12px;
+  height: 12px;
+  background: #ff4d4f;
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.recording-time {
+  font-family: 'Courier New', monospace;
+  color: #262626;
+}
+
+.control-buttons {
+  display: flex;
+  justify-content: center;
+}
+
+/* Playback Section */
+.playback-section {
+  background: #f6f8fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e1e4e8;
+}
+
+.playback-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.playback-header .ant-typography {
+  color: #262626;
+  font-size: 14px;
+}
+
+.playback-controls {
+  display: flex;
+  align-items: center;
+}
+
+.playback-controls audio {
+  flex: 1;
+  height: 40px;
+}
+
+/* Dark theme support */
+[data-theme="dark"] .record-audio-modal .ant-modal-header {
+  background: #1f1f1f;
+  border-bottom-color: #303030;
+}
+
+[data-theme="dark"] .record-modal-title {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .device-selection .ant-typography,
+[data-theme="dark"] .filename-input .ant-typography,
+[data-theme="dark"] .playback-header .ant-typography {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .recording-controls {
+  background: #1f1f1f;
+  border-color: #434343;
+}
+
+[data-theme="dark"] .recording-time {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .playback-section {
+  background: #1f1f1f;
+  border-color: #434343;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .record-audio-modal {
+    margin: 0 16px;
+  }
+  
+  .record-modal-content {
+    padding: 16px 0;
+  }
+  
+  .recording-controls {
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  
+  .control-buttons .ant-space {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .control-buttons .ant-btn {
+    width: 100%;
+  }
+  
+  .playback-controls {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .playback-controls .ant-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .record-audio-modal .ant-modal-header {
+    padding: 12px 16px;
+  }
+  
+  .record-modal-title {
+    font-size: 16px;
+  }
+  
+  .recording-time .ant-typography {
+    font-size: 20px !important;
+  }
+}

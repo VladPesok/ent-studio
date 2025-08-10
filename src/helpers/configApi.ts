@@ -1,7 +1,7 @@
 import type { DictionaryType } from "../../electron/preload";
 const api = window.electronAPI;
 
-export type TabEntry = { name: string; folder: string }; // "folder" is FS-safe id
+export type TabEntry = { name?: string; folder: string }; // "folder" is FS-safe id, name only for custom tabs
 
 /* ---------- dictionaries ---------- */
 export const getDictionaries = async () => await api.getDictionaries();
@@ -22,9 +22,9 @@ export const setSession = (patch: Partial<{ currentDoctor: string|null }>) =>
 
 /* ---------- get / set shownTabs ---------- */
 export const getDefaultTabs = (): TabEntry[] => [
-  { name: "Відео матеріали", folder: "video" },
-  { name: "Голосовий звіт", folder: "audio" }
-];
+  { folder: "video" },
+  { folder: "audio" }
+] as TabEntry[];
 
 export const getShownTabs = async (): Promise<TabEntry[]> => {
   try {
@@ -35,7 +35,10 @@ export const getShownTabs = async (): Promise<TabEntry[]> => {
 };
 
 export const setShownTabs = async (tabs: TabEntry[]): Promise<void> => {
-  await window.electronAPI.setShownTabs(tabs);
+  await window.electronAPI.setShownTabs(tabs.map(tab => ({
+    name: tab.name || tab.folder,
+    folder: tab.folder
+  })));
 };
 
 export const createFolderName = (name: string): string => {

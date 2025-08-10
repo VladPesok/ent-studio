@@ -35,10 +35,21 @@ const Settings: React.FC = () => {
     }
     
     const currentTabs = Array.isArray(shownTabs) ? shownTabs : configApi.getDefaultTabs();
+    const defaultTabs = configApi.getDefaultTabs();
+    
     const newTabs: configApi.TabEntry[] = values.map(value => {
+      // Check if it's a default tab (by folder name or translated name)
+      const defaultTab = defaultTabs.find(tab => 
+        tab.folder === value || t(tab.folder) === value
+      );
+      
+      if (defaultTab) {
+        return defaultTab; // Return default tab without name property
+      }
+      
+      // Check if it's an existing custom tab
       const existingTab = currentTabs.find(tab => 
         (tab.name === value) || 
-        (t(tab.name) === value) ||
         (tab.folder === value)
       );
       
@@ -46,6 +57,7 @@ const Settings: React.FC = () => {
         return existingTab;
       }
       
+      // Create new custom tab
       return {
         name: value,
         folder: configApi.createFolderName(value)
@@ -65,14 +77,14 @@ const Settings: React.FC = () => {
   
   const allTabOptions = [
     ...defaultTabs.map(tab => ({
-      label: t(tab.name),
-      value: tab.name
+      label: t(tab.folder),
+      value: t(tab.folder)
     })),
     ...currentShownTabs
-      .filter(tab => !defaultTabs.some(dt => dt.name === tab.name))
+      .filter(tab => !defaultTabs.some(dt => dt.folder === tab.folder))
       .map(tab => ({
-        label: tab.name,
-        value: tab.name
+        label: tab.name || tab.folder,
+        value: tab.name || tab.folder
       }))
   ];
 
@@ -95,7 +107,14 @@ const Settings: React.FC = () => {
               mode="tags"
               style={{ width: '100%' }}
               placeholder="Оберіть або введіть назву вкладки..."
-              value={currentShownTabs.map(tab => tab.name)}
+              value={currentShownTabs.map(tab => {
+                // For default tabs, use translated name
+                if (defaultTabs.some(dt => dt.folder === tab.folder)) {
+                  return t(tab.folder);
+                }
+                // For custom tabs, use the name property
+                return tab.name || tab.folder;
+              })}
               onChange={handleTabsChange}
               options={allTabOptions}
               loading={loading}
@@ -105,7 +124,7 @@ const Settings: React.FC = () => {
         </Form>
         
         <Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
-          <strong>Стандартні вкладки:</strong> {defaultTabs.map(tab => t(tab.name)).join(', ')}
+          <strong>Стандартні вкладки:</strong> {defaultTabs.map(tab => t(tab.folder)).join(', ')}
         </Paragraph>
       </Card>
     </div>

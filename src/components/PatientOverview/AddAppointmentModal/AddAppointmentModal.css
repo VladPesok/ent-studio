@@ -1,0 +1,191 @@
+/* AddAppointmentModal Styles */
+.add-appointment-modal .ant-modal-content {
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+.add-appointment-modal .ant-modal-title {
+  color: white !important;
+  font-size: 16px !important;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+}
+
+.modal-icon {
+  font-size: 16px;
+  color: white;
+}
+
+.modal-description {
+  display: block;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #666;
+  background: #f8f9fa;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-left: 3px solid #1890ff;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px !important;
+  color: #1890ff;
+  font-weight: 600;
+  font-size: 15px !important;
+}
+
+.section-title .anticon {
+  font-size: 16px;
+}
+
+.optional-section .section-title {
+  color: #52c41a;
+}
+
+.optional-label {
+  font-size: 11px;
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+.input-icon {
+  color: #bfbfbf;
+}
+
+/* Form Item Styling */
+.appointment-form .ant-form-item-label > label {
+  font-weight: 600;
+  color: #262626;
+}
+
+.appointment-form .ant-input,
+.appointment-form .ant-picker,
+.appointment-form .ant-select-selector {
+  border-radius: 8px;
+  border: 2px solid #f0f0f0;
+  transition: all 0.3s ease;
+}
+
+.appointment-form .ant-input:hover,
+.appointment-form .ant-picker:hover,
+.appointment-form .ant-select-selector:hover {
+  border-color: #40a9ff;
+}
+
+.appointment-form .ant-input:focus,
+.appointment-form .ant-picker:focus,
+.appointment-form .ant-select-focused .ant-select-selector {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* Divider Styling */
+.appointment-form .ant-divider {
+  margin: 16px 0;
+  border-color: #f0f0f0;
+}
+
+/* Modal Footer */
+.add-appointment-modal .ant-modal-footer {
+  padding: 12px 0px 0px;
+  border-top: 1px solid #f0f0f0;
+  background: transparent;
+}
+
+.add-appointment-modal .ant-btn {
+  border-radius: 6px;
+  font-weight: 500;
+  height: 36px;
+  padding: 0 20px;
+}
+
+.add-appointment-modal .ant-btn-primary {
+  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
+}
+
+.add-appointment-modal .ant-btn-primary:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
+}
+
+.add-appointment-modal .ant-btn-default {
+  border: 1px solid #d9d9d9;
+  color: #595959;
+  background: transparent;
+}
+
+.add-appointment-modal .ant-btn-default:hover {
+  border-color: #40a9ff;
+  color: #40a9ff;
+  background: transparent;
+}
+
+/* Select Dropdown Styling */
+.ant-select-dropdown {
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.ant-select-item-option-selected {
+  background-color: #e6f7ff;
+  color: #1890ff;
+}
+
+.ant-select-item-option:hover {
+  background-color: #f5f5f5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .add-appointment-modal {
+    width: 95% !important;
+    margin: 8px auto;
+  }
+  
+  .appointment-form .ant-col {
+    margin-bottom: 0;
+  }
+  
+  .add-appointment-modal .ant-modal-header {
+    padding: 10px 12px;
+  }
+  
+  .add-appointment-modal .ant-modal-footer {
+    padding: 10px 12px;
+  }
+}
+
+/* Loading State */
+.add-appointment-modal .ant-btn-loading {
+  pointer-events: none;
+}
+
+/* Focus States */
+.appointment-form .ant-input:focus,
+.appointment-form .ant-picker-focused,
+.appointment-form .ant-select-focused .ant-select-selector {
+  outline: none;
+}
+
+/* Error States */
+.appointment-form .ant-form-item-has-error .ant-input,
+.appointment-form .ant-form-item-has-error .ant-picker,
+.appointment-form .ant-form-item-has-error .ant-select-selector {
+  border-color: #ff4d4f;
+}
+
+.appointment-form .ant-form-item-has-error .ant-input:focus,
+.appointment-form .ant-form-item-has-error .ant-picker:focus,
+.appointment-form .ant-form-item-has-error .ant-select-focused .ant-select-selector {
+  box-shadow: 0 0 0 2px rgba(255, 77, 79, 0.2);
+}
