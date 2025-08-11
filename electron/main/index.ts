@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, shell, ipcMain, Menu } from 'electron'
+import { app, BrowserWindow, shell, dialog, ipcMain } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -7,9 +7,9 @@ import { update } from './update'
 
 import { registerFsIpc } from "../../helpers/fs";
 
-
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
 
 process.env.APP_ROOT = path.join(__dirname, '../..')
 
@@ -38,23 +38,27 @@ const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: 'ENT Studio',
+    title: 'Main window',
     icon: path.join(process.env.VITE_PUBLIC, 'favicon.ico'),
     webPreferences: {
       preload,
-      webSecurity: false
+      // Warning: Enable nodeIntegration and disable contextIsolation is not secure in production
+      // nodeIntegration: true,
+
+      // Consider using contextBridge.exposeInMainWorld
+      // Read more on https://www.electronjs.org/docs/latest/tutorial/context-isolation
+      // contextIsolation: false,
     },
   })
 
-  if (VITE_DEV_SERVER_URL) {
+  if (VITE_DEV_SERVER_URL) { // #298
     win.loadURL(VITE_DEV_SERVER_URL)
+    // Open devTool if the app is not packaged
     win.webContents.openDevTools()
   } else {
     win.loadFile(indexHtml)
   }
 
-  
-  Menu.setApplicationMenu(null);
   // Test actively push message to the Electron-Renderer
   win.webContents.on('did-finish-load', () => {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
@@ -79,7 +83,6 @@ app.whenReady().then(() => {
     return app.getVersion();
   });
 });
-
 
 app.on('window-all-closed', () => {
   win = null

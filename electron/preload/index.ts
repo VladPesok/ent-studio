@@ -1,5 +1,6 @@
 import { ipcRenderer, contextBridge } from 'electron'
 
+// --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
     const [channel, listener] = args
@@ -18,6 +19,8 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     return ipcRenderer.invoke(channel, ...omit)
   },
 
+  // You can expose other APTs you need here.
+  // ...
 })
 
 export type DictionaryType = "doctors" | "diagnosis";
@@ -169,17 +172,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   /* Update functionality */
   checkForUpdates: () => 
-    ipcRenderer.invoke("check-update"),
+    ipcRenderer.invoke("updater:check"),
   downloadUpdate: () => 
-    ipcRenderer.invoke("download-update"),
+    ipcRenderer.invoke("updater:download"),
   installUpdate: () => 
-    ipcRenderer.invoke("quit-and-install"),
+    ipcRenderer.invoke("updater:install"),
   getUpdateStatus: () => 
-    ipcRenderer.invoke("get-update-status"),
+    ipcRenderer.invoke("updater:status"),
   getAppVersion: () => 
-    ipcRenderer.invoke("get-app-version"),
+    ipcRenderer.invoke("updater:version"),
 });
 
+// --------- Preload scripts loading ---------
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {
   return new Promise(resolve => {
     if (condition.includes(document.readyState)) {

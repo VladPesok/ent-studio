@@ -63,6 +63,31 @@ export function update(win: Electron.BrowserWindow) {
   ipcMain.handle('quit-and-install', () => {
     autoUpdater.quitAndInstall(false, true)
   })
+
+  // Download update handler
+  ipcMain.handle('download-update', () => {
+    return new Promise((resolve, reject) => {
+      startDownload(
+        (error, progressInfo) => {
+          if (error) {
+            reject(error)
+          }
+        },
+        () => {
+          resolve(true)
+        }
+      )
+    })
+  })
+
+  // Get update status handler
+  ipcMain.handle('get-update-status', () => {
+    return {
+      isUpdateAvailable: false, // This would need to be tracked based on update events
+      isDownloading: false,     // This would need to be tracked during download
+      isUpdateDownloaded: false // This would need to be tracked after download
+    }
+  })
 }
 
 function startDownload(
