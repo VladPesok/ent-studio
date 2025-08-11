@@ -33,3 +33,4 @@ yarn.lock
 /playwright/.cache/
 
 .vscode
+.trae
