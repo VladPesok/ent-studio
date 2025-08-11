@@ -2,6 +2,7 @@ import fs from "fs/promises";
 import path, { extname } from "path";
 import type { App, Dialog, IpcMain } from "electron";
 import { shell } from "electron";
+import { spawn, execFile  } from "child_process";
 
 export const makePatientsRoot = (app: App) =>
   path.join(app.getPath("userData"), "patients");
@@ -154,7 +155,7 @@ export const registerFsIpc = (
 
   const DEFAULT_CFG = {
     dictionaries: { doctors: [] as string[], diagnosis: [] as string[] },
-    settings    : { theme: "light" as "light" | "dark", locale: "en" as "en" | "ua" },
+    settings    : { theme: "light" as "light" | "dark", locale: "en" as "en" | "ua", praatPath: "" as string },
     session     : { currentDoctor: null as string | null },
     shownTabs   : [
       { name: "video_materials", folder: "video" },
@@ -615,6 +616,107 @@ export const registerFsIpc = (
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });
+
+  // Praat integration handlers
+  ipc.handle("praat:selectExecutable", async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ["openFile"],
+      filters: [
+        { name: "Praat Executable", extensions: ["exe"] },
+        { name: "All Files", extensions: ["*"] }
+      ],
+      title: "Select Praat Executable"
+    });
+    
+    if (canceled || !filePaths.length) return { success: false, path: null };
+    
+    return { success: true, path: filePaths[0] };
+  });
+
+  async function isExecutable(p: string) {
+    try {
+      await fs.access(p, process.platform === "win32" ? fs.constants.F_OK : fs.constants.X_OK);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function closePraatProcesses() {
+    const platform = process.platform;
+    
+    try {
+      if (platform === "win32") {
+        // Windows: kill all Praat processes
+        spawn("taskkill", ["/F", "/IM", "Praat.exe"], { stdio: "ignore" });
+      } else if (platform === "darwin") {
+        // macOS: kill all Praat processes
+        spawn("pkill", ["-f", "Praat"], { stdio: "ignore" });
+      } else {
+        // Linux/Unix: kill all Praat processes
+        spawn("pkill", ["-f", "praat"], { stdio: "ignore" });
+      }
+      
+      // Wait a moment for processes to close
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } catch (error) {
+      console.log('Note: Could not close existing Praat processes:', error);
+      // Continue anyway - this is not a critical error
+    }
+  }
+
+  async function launchPraat(praatPath: string, audioFilePath: string) {
+    const platform = process.platform;
+    console.log('Platform:', platform);
+
+    // First, try to close any existing Praat processes
+    await closePraatProcesses();
+
+    if (platform === "darwin") {
+      // macOS: use --open flag
+      const child = spawn(praatPath, ["--open", audioFilePath], { stdio: "ignore", detached: true });
+      child.unref();
+      return;
+    }
+
+    if (platform === "win32") {
+      // Windows: use --open flag with spawn
+      const child = spawn(praatPath, ["--open", audioFilePath], {
+        stdio: "ignore",
+        detached: true
+      });
+      child.unref();
+      return;
+    }
+
+    // Linux/Unix: use --open flag
+    const child = spawn(praatPath, ["--open", audioFilePath], { stdio: "ignore", detached: true });
+    child.unref();
+  }
+
+  ipc.handle("praat:openFile", async (_e, praatPath: string, audioFilePath: string) => {
+    try {
+      // Basic checks + helpful diagnostics
+      if (!praatPath || !audioFilePath) {
+        return { success: false, error: "Missing praatPath or audioFilePath" };
+      }
+
+      const [praatExists, audioExists] = await Promise.all([
+        isExecutable(praatPath),
+        fs.access(audioFilePath).then(() => true).catch(() => false),
+      ]);
+
+      if (!praatExists) return { success: false, error: `Praat not found or not executable: ${praatPath}` };
+      if (!audioExists) return { success: false, error: `Audio file not found: ${audioFilePath}` };
+
+      await launchPraat(praatPath, audioFilePath);
+      return { success: true };
+    } catch (error) {
+      console.error("Error opening file with Praat:", error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
 
 };
 

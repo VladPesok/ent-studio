@@ -81,64 +81,63 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
-const pickAudioMime = () => {
-  const candidates = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4;codecs=mp4a.40.2',  // Safari fallback
-    'audio/mp4',
-    'audio/ogg;codecs=opus'
-  ];
-  return candidates.find((t) => (window as any).MediaRecorder?.isTypeSupported?.(t)) || '';
-};
+    
+  const pickAudioMime = () => {
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4;codecs=mp4a.40.2',  // Safari fallback
+      'audio/mp4',
+      'audio/ogg;codecs=opus'
+    ];
+    return candidates.find((t) => (window as any).MediaRecorder?.isTypeSupported?.(t)) || '';
+  };
 
-// Start recording
-const startRecording = async () => {
-  try {
-    const constraints: MediaStreamConstraints = {
-      audio: selectedDevice ? { deviceId: { exact: selectedDevice } } : true
-    };
+  // Start recording
+  const startRecording = async () => {
+    try {
+      const constraints: MediaStreamConstraints = {
+        audio: selectedDevice ? { deviceId: { exact: selectedDevice } } : true
+      };
 
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    streamRef.current = stream;
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
 
-    const mimeType = pickAudioMime();
-    const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    mediaRecorderRef.current = mediaRecorder;
-    audioChunksRef.current = [];
+      const mimeType = pickAudioMime();
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) audioChunksRef.current.push(event.data);
-    };
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
 
-    mediaRecorder.onstop = () => {
-      // preserve original type for correct conversion branch
-      const type = mediaRecorder.mimeType || 'audio/webm';
-      const blob = new Blob(audioChunksRef.current, { type });
-      setAudioBlob(blob);
-      const url = URL.createObjectURL(blob);
-      setAudioUrl(url);
+      mediaRecorder.onstop = () => {
+        // preserve original type for correct conversion branch
+        const type = mediaRecorder.mimeType || 'audio/webm';
+        const blob = new Blob(audioChunksRef.current, { type });
+        setAudioBlob(blob);
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
 
-      setFileExtension('.wav');
-      setFilename((prev) =>
-        (prev || generateDefaultFilename()).replace(/\.[^.]+$/, '') + '.wav'
-      );
+        setFileExtension('.wav');
+        setFilename((prev) =>
+          (prev || generateDefaultFilename()).replace(/\.[^.]+$/, '') + '.wav'
+        );
 
-      if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
-    };
+        if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
+      };
 
-    mediaRecorder.start(1000);
-    setIsRecording(true);
-    setIsPaused(false);
-    setRecordingTime(0);
+      mediaRecorder.start(1000);
+      setIsRecording(true);
+      setIsPaused(false);
+      setRecordingTime(0);
 
-    timerRef.current = setInterval(() => setRecordingTime((p) => p + 1), 1000);
-  } catch (e) {
-    console.error('Error starting recording:', e);
-    message.error('Failed to start recording. Please check microphone permissions.');
-  }
-};
-
+      timerRef.current = setInterval(() => setRecordingTime((p) => p + 1), 1000);
+    } catch (e) {
+      message.error('Failed to start recording. Please check microphone permissions.');
+    }
+  };
 
   // Pause/Resume recording
   const togglePauseRecording = () => {
@@ -161,7 +160,6 @@ const startRecording = async () => {
     }
   };
 
-  // Stop recording
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
@@ -174,7 +172,6 @@ const startRecording = async () => {
     }
   };
 
-  // Delete recording
   const deleteRecording = () => {
     setAudioBlob(null);
     setAudioUrl('');
@@ -234,31 +231,24 @@ const startRecording = async () => {
     }
   };
 
-
-  // Handle modal cancel
   const handleCancel = () => {
-    // Stop recording if active
     if (isRecording) {
       stopRecording();
     }
     
-    // Stop playback
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
     
-    // Clear timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
     
-    // Stop media stream
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
     }
     
-    // Reset state
     setIsRecording(false);
     setIsPaused(false);
     setRecordingTime(0);
@@ -270,7 +260,6 @@ const startRecording = async () => {
     onCancel();
   };
 
-  // Initialize when modal opens
   useEffect(() => {
     if (visible) {
       setFilename(generateDefaultFilename());
@@ -278,7 +267,6 @@ const startRecording = async () => {
     }
   }, [visible]);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) {

@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Button, Space } from 'antd';
+import { Button, Space, message } from 'antd';
 import { 
   PlusOutlined, 
   FolderOpenOutlined,
-  AudioOutlined
+  AudioOutlined,
+  ExperimentOutlined
 } from '@ant-design/icons';
 import RecordAudioModal from './RecordAudioModal/RecordAudioModal';
+import * as configApi from "../../../helpers/configApi";
 
 import "./AudioGallery.css";
 
@@ -30,6 +32,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
   const [currentPlaying, setCurrentPlaying] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [recordModalVisible, setRecordModalVisible] = useState(false);
+  const [praatPath, setPraatPath] = useState<string>("");
 
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({});
 
@@ -73,6 +76,17 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
 
   useEffect(() => {
     loadAudioFiles();
+    
+    // Load Praat path from settings
+    const loadPraatPath = async () => {
+      try {
+        const settings = await configApi.getSettings();
+        setPraatPath(settings.praatPath || "");
+      } catch (error) {
+        console.error('Failed to load Praat path:', error);
+      }
+    };
+    loadPraatPath();
   }, [loadAudioFiles]);
 
   const handleLoadMoreAudio = async () => {
@@ -91,26 +105,6 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
       await window.electronAPI.openAudioFolder(baseFolder, currentAppointment);
     } catch (error) {
       console.error("Failed to open audio folder:", error);
-    }
-  };
-
-  const handlePlayPause = (audioFile: AudioFile) => {
-    const audioElement = audioRefs.current[audioFile.url];
-    if (!audioElement) return;
-
-    if (currentPlaying === audioFile.url) {
-      audioElement.pause();
-      setCurrentPlaying(null);
-    } else {
-      // Pause any currently playing audio
-      Object.values(audioRefs.current).forEach(audio => {
-        if (!audio.paused) {
-          audio.pause();
-        }
-      });
-      
-      audioElement.play();
-      setCurrentPlaying(audioFile.url);
     }
   };
 
@@ -139,6 +133,25 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
     } catch (error) {
       console.error('Error saving recording:', error);
       throw error;
+    }
+  };
+
+  const handleOpenWithPraat = async (audioFile: AudioFile) => {
+    if (!praatPath) {
+      message.warning('Шлях до Praat не налаштовано. Перейдіть до налаштувань для конфігурації.');
+      return;
+    }
+
+    try {
+      const success = await configApi.openFileWithPraat(praatPath, audioFile.path);
+      if (success) {
+        message.success(`Файл ${audioFile.fileName} відкрито в Praat`);
+      } else {
+        message.error('Помилка при відкритті файлу в Praat');
+      }
+    } catch (error) {
+      console.error('Error opening file with Praat:', error);
+      message.error('Помилка при відкритті файлу в Praat');
     }
   };
 
@@ -182,6 +195,12 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
             </Button>
           </Space>
         </div>
+        
+        <RecordAudioModal
+          visible={recordModalVisible}
+          onCancel={() => setRecordModalVisible(false)}
+          onSave={handleSaveRecording}
+        />
       </div>
     );
   }
@@ -224,9 +243,22 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
               <div className="audio-file-main">
                 <div className="audio-file-details">
                   <div className="audio-file-header">
-                    <h4 className="audio-file-name" title={audioFile.fileName}>
-                      {audioFile.fileName}
-                    </h4>
+                    <div className="audio-file-title-row">
+                      <h4 className="audio-file-name" title={audioFile.fileName}>
+                        {audioFile.fileName}
+                      </h4>
+                      {praatPath && (
+                        <Button
+                          size="small"
+                          icon={<ExperimentOutlined />}
+                          onClick={() => handleOpenWithPraat(audioFile)}
+                          title="Відкрити в Praat"
+                          className="praat-button"
+                        >
+                          Praat
+                        </Button>
+                      )}
+                    </div>
                     <div className="audio-file-meta">
                       <span className="file-size">{formatFileSize(audioFile.size)}</span>
                       <span className="file-ext">{audioFile.extension.toUpperCase()}</span>

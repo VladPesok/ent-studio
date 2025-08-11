@@ -10,7 +10,7 @@ export const addDictionaryEntry = (entryName: DictionaryType, name: string) =>
 
 /* ---------- settings ---------- */
 export const getSettings = () => api.getSettings();
-export const setSettings = (patch: Partial<{ theme:"light"|"dark"; locale:"en"|"ua" }>) =>
+export const setSettings = (patch: Partial<{ theme:"light"|"dark"; locale:"en"|"ua"; praatPath?: string }>) =>
   api.setSettings(patch);
 
 /* ---------- session ---------- */
@@ -47,4 +47,15 @@ export const createFolderName = (name: string): string => {
     .replace(/[^a-z0-9а-я]/gi, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
+};
+
+/* ---------- Praat integration ---------- */
+export const selectPraatExecutable = async (): Promise<string | null> => {
+  const result = await api.selectPraatExecutable();
+  return result.success ? result.path : null;
+};
+
+export const openFileWithPraat = async (praatPath: string, audioFilePath: string): Promise<boolean> => {
+  const result = await api.openFileWithPraat(praatPath, audioFilePath);
+  return result.success;
 };

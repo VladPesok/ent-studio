@@ -173,9 +173,9 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
                   name="doctor"
                 >
                   <CreatableSelect
-                    value={form.getFieldValue('doctor') || null}
+                    value={form.getFieldValue('doctor')}
+                    onChange={(value) => form.setFieldsValue({ doctor: value })}
                     items={Array.isArray(doctors) ? doctors : []}
-                    onChange={(value) => form.setFieldValue('doctor', value)}
                     onCreate={handleDoctorCreate}
                     placeholder="Оберіть або введіть лікаря"
                     style={{ width: '100%' }}
@@ -189,9 +189,9 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
                   name="diagnosis"
                 >
                   <CreatableSelect
-                    value={form.getFieldValue('diagnosis') || null}
+                    value={form.getFieldValue('diagnosis')}
+                    onChange={(value) => form.setFieldsValue({ diagnosis: value })}
                     items={Array.isArray(diagnoses) ? diagnoses : []}
-                    onChange={(value) => form.setFieldValue('diagnosis', value)}
                     onCreate={handleDiagnosisCreate}
                     placeholder="Оберіть або введіть діагноз"
                     style={{ width: '100%' }}

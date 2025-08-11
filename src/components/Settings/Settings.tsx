@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Typography, Divider, theme as antTheme, Form, Select, Card, message } from "antd";
+import { Typography, Divider, theme as antTheme, Form, Select, Card, message, Button, Input, Space } from "antd";
+import { FolderOpenOutlined, DeleteOutlined } from "@ant-design/icons";
 import { useTranslation } from 'react-i18next';
 import * as configApi from "../../helpers/configApi";
 
@@ -12,20 +13,27 @@ const Settings: React.FC = () => {
   
   const [shownTabs, setShownTabs] = useState<configApi.TabEntry[]>(configApi.getDefaultTabs());
   const [loading, setLoading] = useState(true);
+  const [praatPath, setPraatPath] = useState<string>("");
+  const [praatLoading, setPraatLoading] = useState(false);
 
   useEffect(() => {
-    const loadShownTabs = async () => {
+    const loadSettings = async () => {
       try {
-        const tabs = await configApi.getShownTabs();
+        const [tabs, settings] = await Promise.all([
+          configApi.getShownTabs(),
+          configApi.getSettings()
+        ]);
         setShownTabs(Array.isArray(tabs) ? tabs : configApi.getDefaultTabs());
+        setPraatPath(settings.praatPath || "");
       } catch (error) {
-        console.error('Failed to load shown tabs:', error);
+        console.error('Failed to load settings:', error);
         setShownTabs(configApi.getDefaultTabs());
+        setPraatPath("");
       } finally {
         setLoading(false);
       }
     };
-    loadShownTabs();
+    loadSettings();
   }, []);
 
   const handleTabsChange = async (values: string[]) => {
@@ -69,6 +77,34 @@ const Settings: React.FC = () => {
       await configApi.setShownTabs(newTabs);
     } catch (error) {
       console.error('Failed to save shown tabs:', error);
+    }
+  };
+
+  const handleSelectPraatPath = async () => {
+    setPraatLoading(true);
+    try {
+      const selectedPath = await configApi.selectPraatExecutable();
+      if (selectedPath) {
+        setPraatPath(selectedPath);
+        await configApi.setSettings({ praatPath: selectedPath });
+        message.success('Шлях до Praat успішно збережено');
+      }
+    } catch (error) {
+      console.error('Failed to select Praat path:', error);
+      message.error('Помилка при виборі шляху до Praat');
+    } finally {
+      setPraatLoading(false);
+    }
+  };
+
+  const handleClearPraatPath = async () => {
+    try {
+      setPraatPath("");
+      await configApi.setSettings({ praatPath: "" });
+      message.success('Шлях до Praat очищено');
+    } catch (error) {
+      console.error('Failed to clear Praat path:', error);
+      message.error('Помилка при очищенні шляху до Praat');
     }
   };
 
@@ -126,6 +162,46 @@ const Settings: React.FC = () => {
         <Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
           <strong>Стандартні вкладки:</strong> {defaultTabs.map(tab => t(tab.folder)).join(', ')}
         </Paragraph>
+      </Card>
+
+      <Card title="Інтеграція з Praat" style={{ marginBottom: 24 }}>
+        <Form layout="vertical">
+          <Form.Item 
+            label="Шлях до виконуваного файлу Praat"
+            help="Оберіть praat.exe для відкриття аудіо файлів у Praat. Якщо не налаштовано, кнопка 'Відкрити в Praat' не буде відображатися."
+          >
+            <Space.Compact style={{ width: '100%' }}>
+              <Input
+                value={praatPath}
+                placeholder="Шлях до praat.exe не обрано..."
+                readOnly
+                style={{ flex: 1 }}
+              />
+              <Button 
+                icon={<FolderOpenOutlined />}
+                onClick={handleSelectPraatPath}
+                loading={praatLoading}
+              >
+                Обрати
+              </Button>
+              {praatPath && (
+                <Button 
+                  icon={<DeleteOutlined />}
+                  onClick={handleClearPraatPath}
+                  danger
+                >
+                  Очистити
+                </Button>
+              )}
+            </Space.Compact>
+          </Form.Item>
+        </Form>
+        
+        {praatPath && (
+          <Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
+            <strong>Поточний шлях:</strong> {praatPath}
+          </Paragraph>
+        )}
       </Card>
     </div>
   )

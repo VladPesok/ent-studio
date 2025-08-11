@@ -53,8 +53,8 @@ export interface ElectronAPI {
   openPatientFolderInFs(base: string): Promise<void>;
 
   /* settings & session & dictionaries */
-  getSettings(): Promise<{ theme: "light" | "dark"; locale: "en" | "ua" }>;
-  setSettings(patch: Partial<{ theme: "light" | "dark"; locale: "en" | "ua" }>): Promise<void>;
+  getSettings(): Promise<{ theme: "light" | "dark"; locale: "en" | "ua"; praatPath: string }>;
+  setSettings(patch: Partial<{ theme: "light" | "dark"; locale: "en" | "ua"; praatPath?: string }>): Promise<void>;
 
   getSession(): Promise<{ currentDoctor: string | null }>;
   setSession(patch: Partial<{ currentDoctor: string | null }>): Promise<void>;
@@ -89,6 +89,10 @@ export interface ElectronAPI {
   loadMoreAudio(folder: string, currentAppointment?: string): Promise<{ success: boolean; count: number }>;
   openAudioFolder(folder: string, currentAppointment?: string): Promise<string>;
   saveRecordedAudio(folder: string, currentAppointment: string | undefined, audioBuffer: ArrayBuffer, filename: string): Promise<{ success: boolean; filePath?: string; error?: string }>;
+
+  /* Praat integration */
+  selectPraatExecutable(): Promise<{ success: boolean; path: string | null }>;
+  openFileWithPraat(praatPath: string, audioFilePath: string): Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {
@@ -149,6 +153,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("patient:openAudioFolder", folder, currentAppointment),
   saveRecordedAudio: (folder: string, currentAppointment: string | undefined, audioBuffer: ArrayBuffer, filename: string) => 
     ipcRenderer.invoke("patient:saveRecordedAudio", folder, currentAppointment, audioBuffer, filename),
+
+  /* Praat integration */
+  selectPraatExecutable: () => 
+    ipcRenderer.invoke("praat:selectExecutable"),
+  openFileWithPraat: (praatPath: string, audioFilePath: string) => 
+    ipcRenderer.invoke("praat:openFile", praatPath, audioFilePath),
 });
 
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {
