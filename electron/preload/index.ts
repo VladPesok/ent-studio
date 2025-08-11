@@ -93,6 +93,13 @@ export interface ElectronAPI {
   /* Praat integration */
   selectPraatExecutable(): Promise<{ success: boolean; path: string | null }>;
   openFileWithPraat(praatPath: string, audioFilePath: string): Promise<{ success: boolean; error?: string }>;
+
+  /* Update functionality */
+  checkForUpdates(): Promise<{ updateAvailable: boolean; updateInfo?: any }>;
+  downloadUpdate(): Promise<void>;
+  installUpdate(): Promise<void>;
+  getUpdateStatus(): Promise<any>;
+  getAppVersion(): Promise<string>;
 }
 
 declare global {
@@ -159,6 +166,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("praat:selectExecutable"),
   openFileWithPraat: (praatPath: string, audioFilePath: string) => 
     ipcRenderer.invoke("praat:openFile", praatPath, audioFilePath),
+
+  /* Update functionality */
+  checkForUpdates: () => 
+    ipcRenderer.invoke("check-update"),
+  downloadUpdate: () => 
+    ipcRenderer.invoke("download-update"),
+  installUpdate: () => 
+    ipcRenderer.invoke("quit-and-install"),
+  getUpdateStatus: () => 
+    ipcRenderer.invoke("get-update-status"),
+  getAppVersion: () => 
+    ipcRenderer.invoke("get-app-version"),
 });
 
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {
