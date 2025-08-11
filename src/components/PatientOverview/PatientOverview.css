@@ -1,0 +1,128 @@
+.record-grid {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  height: 100%;
+}
+
+/* ---------- sidebar ---------- */
+.sidebar {
+  width: 400px;
+  padding: 16px;
+  background: #fff;
+  flex-shrink: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.sidebar-header{
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.patient-meta{
+  font-weight: 600;
+
+}
+
+.patient-title {
+  font-size: 1.5rem;
+}
+
+.record-actions {
+  margin-bottom: 8px;
+}
+
+.btn.save   { margin-right: 6px; }
+
+/* form controls */
+.form-grid label      { font-size: .85rem; font-weight: 500; margin-bottom: 4px; display: block; }
+.form-grid textarea   { width: 354px; border: 1px solid #d1d5db; border-radius: 6px; padding: 6px; }
+
+
+.main-panel{
+  width: 100%;
+}
+/* ---------- tab bar ---------- */
+.main-panel .tabs {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #fff;
+  padding-top: 16px;
+  flex: 1;                    
+}
+
+.tab {
+  padding: 6px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.tab.active {
+  border-bottom: 2px solid #2563eb;
+  font-weight: 600;
+}
+
+.flex-spacer { flex: 1; }   /* pushes back-link right */
+
+.tab-body {
+  padding: 2px 16px;
+}
+
+.back-link {
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: .9rem;
+}
+
+/* ---------- video gallery ---------- */
+.gallery-wrap { margin-top: 0; }
+
+.gallery-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.gallery-title { font-weight: 600; }
+.btn.hide      {
+  font-size: .85rem;
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.large-player { margin-bottom: 8px; }
+.large-player video {
+  width: 100%;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.2);
+}
+
+.thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+.thumb         { position: relative; cursor: pointer; }
+.thumb video   { width: 100%; border-radius: 6px; }
+.thumb-tag     {
+  position: absolute;
+  bottom: 4px;
+  right: 6px;
+  background: rgba(0,0,0,.6);
+  color: #fff;
+  font-size: .7rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* placeholder for future audio tab */
+.placeholder { color: #6b7280; margin-top: 8px; }

@@ -1,6 +1,5 @@
 import { ipcRenderer, contextBridge } from 'electron'
 
-// --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld('ipcRenderer', {
   on(...args: Parameters<typeof ipcRenderer.on>) {
     const [channel, listener] = args
@@ -18,27 +17,82 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     const [channel, ...omit] = args
     return ipcRenderer.invoke(channel, ...omit)
   },
-  
-  // You can expose other APTs you need here.
-  // ...
+
 })
 
 export type DictionaryType = "doctors" | "diagnosis";
 
 export interface ElectronAPI {
+  /* projects & USB */
   scanUsb(): Promise<any>;
   getProjects(): Promise<any>;
 
-  getDictionaries(): Promise<{ doctors: string[]; diagnosis: string[] }>;
-  addDictionaryEntry(type: DictionaryType, entry: string): Promise<void>;
+  /* patient data */
+  getPatient(folder: string): Promise<any>; // returns data from patient.config
+  setPatient(folder: string, data: any): Promise<void>; // saves data to patient.config
+  getPatientAppointments(folder: string): Promise<{ date: string; doctor: string; diagnosis: string }[]>;
+  getPatientAppointment(appointmentPath: string): Promise<any>; // returns data from appointment.config
+  setPatientAppointments(appointmentPath: string, data: any): Promise<void>; // saves appointment.config
+  getCounts(folder: string): Promise<{ videoCount: number }>;
+  getClips(folder: string): Promise<{ video: string[] }>;
+  getClipsDetailed(folder: string, offset?: number, limit?: number): Promise<{
+    clips: Array<{
+      url: string;
+      fileName: string;
+      fileType: string;
+      hasAudio: boolean;
+      size: number;
+      modified: Date;
+      extension: string;
+    }>;
+    total: number;
+    hasMore: boolean;
+  }>;
+  loadMoreVideos(folder: string): Promise<{ success: boolean; count: number }>;
+  makePatient(base: string, date: string): Promise<void>;
+  openPatientFolderInFs(base: string): Promise<void>;
 
-  getPatient(folder: string): Promise<any>;
-  setPatient(folder: string, data: unknown): Promise<void>;
-  getCounts(folder: string): Promise<{ videoCount: number; videoAudioCount: number }>;
-  getClips(folder: string): Promise<{ video: string[]; videoAudio: string[] }>;
-  addVoiceReport(folder: string): Promise<any>;
-  openVoiceDoc(folder: string, fileName: string): Promise<any>;
-  deleteVoiceDoc(folder: string, fileName: string): Promise<any>;
+  /* settings & session & dictionaries */
+  getSettings(): Promise<{ theme: "light" | "dark"; locale: "en" | "ua"; praatPath: string }>;
+  setSettings(patch: Partial<{ theme: "light" | "dark"; locale: "en" | "ua"; praatPath?: string }>): Promise<void>;
+
+  getSession(): Promise<{ currentDoctor: string | null }>;
+  setSession(patch: Partial<{ currentDoctor: string | null }>): Promise<void>;
+
+  getShownTabs(): Promise<{ name: string; folder: string }[]>;
+  setShownTabs(tabs: { name: string; folder: string }[]): Promise<void>;
+
+  getDictionaries(): Promise<{ doctors: string[]; diagnosis: string[] }>;
+  addDictionaryEntry(type: DictionaryType, value: string): Promise<void>;
+
+  /* CustomTab file operations */
+  getCustomTabFiles(folder: string, tabFolder: string, currentAppointment?: string): Promise<Array<{
+    name: string;
+    path: string;
+    size: number;
+    extension: string;
+    modified: Date;
+  }>>;
+  selectAndCopyFiles(folder: string, tabFolder: string, currentAppointment?: string): Promise<{ success: boolean; count: number }>;
+  openFileInDefaultApp(filePath: string): Promise<{ success: boolean; error?: string }>;
+
+  /* Audio file operations */
+  getAudioFiles(folder: string, currentAppointment?: string): Promise<Array<{
+    url: string;
+    fileName: string;
+    path: string;
+    size: number;
+    extension: string;
+    modified: Date;
+    fileType: string;
+  }>>;
+  loadMoreAudio(folder: string, currentAppointment?: string): Promise<{ success: boolean; count: number }>;
+  openAudioFolder(folder: string, currentAppointment?: string): Promise<string>;
+  saveRecordedAudio(folder: string, currentAppointment: string | undefined, audioBuffer: ArrayBuffer, filename: string): Promise<{ success: boolean; filePath?: string; error?: string }>;
+
+  /* Praat integration */
+  selectPraatExecutable(): Promise<{ success: boolean; path: string | null }>;
+  openFileWithPraat(praatPath: string, audioFilePath: string): Promise<{ success: boolean; error?: string }>;
 }
 
 declare global {
@@ -47,27 +101,66 @@ declare global {
   }
 }
 
+
 contextBridge.exposeInMainWorld("electronAPI", {
-  scanUsb:       () => ipcRenderer.invoke("scanUsb"),
-  getProjects:   () => ipcRenderer.invoke("getProjects"),
+  /* projects & USB */
+  scanUsb     : ()                => ipcRenderer.invoke("scanUsb"),
+  getProjects : ()                => ipcRenderer.invoke("getProjects"),
 
-  getDictionaries: () => ipcRenderer.invoke("dict:get"),
-  addDictionaryEntry: (type: DictionaryType, entry: string) =>
-    ipcRenderer.invoke("dict:add", type, entry),
+  /* patient data */
+  getPatient : (f: string)         => ipcRenderer.invoke("patient:getMeta", f), // returns data from patient.config
+  setPatient : (f: string, d: any) => ipcRenderer.invoke("patient:setMeta", f, d), // saves data to patient.config
+  
+  getPatientAppointments: (f: string) => ipcRenderer.invoke("patient:appointments", f),
+  getPatientAppointment: (appointmentPath: string) => ipcRenderer.invoke("patient:getAppointment", appointmentPath), // returns data from appointment.config
+  setPatientAppointments: (appointmentPath: string, d: any) => ipcRenderer.invoke("patient:setAppointment", appointmentPath, d), // saves appointment.config
+  
+  getCounts  : (f: string)         => ipcRenderer.invoke("patient:counts", f),
+  getClips   : (f: string)         => ipcRenderer.invoke("patient:clips",  f),
+  getClipsDetailed: (f: string, offset?: number, limit?: number) => ipcRenderer.invoke("patient:clipsDetailed", f, offset, limit),
+  loadMoreVideos: (f: string)      => ipcRenderer.invoke("patient:loadMoreVideos", f),
+  makePatient: (base: string, date: string) => ipcRenderer.invoke("patient:new", base, date),
 
-  getPatient:  (folder: string)          => ipcRenderer.invoke("patient:get", folder),
-  setPatient:  (folder: string, data: unknown) =>
-    ipcRenderer.invoke("patient:set", folder, data),
+  openPatientFolderInFs: (folder: string) => ipcRenderer.invoke("patient:openFolder", folder),
 
-  getCounts:   (folder: string)          => ipcRenderer.invoke("patient:counts", folder),
-  getClips:    (folder: string)          => ipcRenderer.invoke("patient:clips", folder),
-  addVoiceReport: (folder: string) => ipcRenderer.invoke("voice:add", folder),
-  openVoiceDoc: (folder: string, fileName: string) => ipcRenderer.invoke("voice:open", folder, fileName),
-  deleteVoiceDoc: (folder: string, file: string) => ipcRenderer.invoke("voice:delete", folder, file)
-} satisfies ElectronAPI);
+  /* settings & session & dictionaries */
+  getSettings: ()                 => ipcRenderer.invoke("settings:get"),
+  setSettings: (p: any)           => ipcRenderer.invoke("settings:set", p),
 
+  getSession : ()                 => ipcRenderer.invoke("session:get"),
+  setSession : (p: any)           => ipcRenderer.invoke("session:set", p),
 
-// --------- Preload scripts loading ---------
+  getShownTabs: ()                => ipcRenderer.invoke("shownTabs:get"),
+  setShownTabs: (tabs: any)       => ipcRenderer.invoke("shownTabs:set", tabs),
+
+  getDictionaries  : ()                                   => ipcRenderer.invoke("dict:get"),
+  addDictionaryEntry: (t: DictionaryType, e: string)     => ipcRenderer.invoke("dict:add", t, e),
+
+  /* CustomTab file operations */
+  getCustomTabFiles: (folder: string, tabFolder: string, currentAppointment?: string) => 
+    ipcRenderer.invoke("getCustomTabFiles", folder, tabFolder, currentAppointment),
+  selectAndCopyFiles: (folder: string, tabFolder: string, currentAppointment?: string) => 
+    ipcRenderer.invoke("selectAndCopyFiles", folder, tabFolder, currentAppointment),
+  openFileInDefaultApp: (filePath: string) => 
+    ipcRenderer.invoke("openFileInDefaultApp", filePath),
+
+  /* Audio file operations */
+  getAudioFiles: (folder: string, currentAppointment?: string) => 
+    ipcRenderer.invoke("patient:audioFiles", folder, currentAppointment),
+  loadMoreAudio: (folder: string, currentAppointment?: string) => 
+    ipcRenderer.invoke("patient:loadMoreAudio", folder, currentAppointment),
+  openAudioFolder: (folder: string, currentAppointment?: string) => 
+    ipcRenderer.invoke("patient:openAudioFolder", folder, currentAppointment),
+  saveRecordedAudio: (folder: string, currentAppointment: string | undefined, audioBuffer: ArrayBuffer, filename: string) => 
+    ipcRenderer.invoke("patient:saveRecordedAudio", folder, currentAppointment, audioBuffer, filename),
+
+  /* Praat integration */
+  selectPraatExecutable: () => 
+    ipcRenderer.invoke("praat:selectExecutable"),
+  openFileWithPraat: (praatPath: string, audioFilePath: string) => 
+    ipcRenderer.invoke("praat:openFile", praatPath, audioFilePath),
+});
+
 function domReady(condition: DocumentReadyState[] = ['complete', 'interactive']) {
   return new Promise(resolve => {
     if (condition.includes(document.readyState)) {
