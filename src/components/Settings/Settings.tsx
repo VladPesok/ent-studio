@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Typography, Divider, theme as antTheme, Form, Select, Card, message, Button, Input, Space } from "antd";
-import { FolderOpenOutlined, DeleteOutlined } from "@ant-design/icons";
+import { FolderOpenOutlined, DeleteOutlined, DownloadOutlined, SyncOutlined } from "@ant-design/icons";
 import { useTranslation } from 'react-i18next';
 import * as configApi from "../../helpers/configApi";
+import * as versionsApi from "../../helpers/versionsApi";
 
 const { Title, Paragraph } = Typography;
 const { useToken } = antTheme;
@@ -15,20 +16,30 @@ const Settings: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [praatPath, setPraatPath] = useState<string>("");
   const [praatLoading, setPraatLoading] = useState(false);
+  
+  // Update states
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<any>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [downloadingUpdate, setDownloadingUpdate] = useState(false);
+  const [currentVersion, setCurrentVersion] = useState<string>("");
 
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const [tabs, settings] = await Promise.all([
+        const [tabs, settings, version] = await Promise.all([
           configApi.getShownTabs(),
-          configApi.getSettings()
+          configApi.getSettings(),
+          versionsApi.getAppVersion()
         ]);
         setShownTabs(Array.isArray(tabs) ? tabs : configApi.getDefaultTabs());
         setPraatPath(settings.praatPath || "");
+        setCurrentVersion(version);
       } catch (error) {
         console.error('Failed to load settings:', error);
         setShownTabs(configApi.getDefaultTabs());
         setPraatPath("");
+        setCurrentVersion("Unknown");
       } finally {
         setLoading(false);
       }
@@ -105,6 +116,40 @@ const Settings: React.FC = () => {
     } catch (error) {
       console.error('Failed to clear Praat path:', error);
       message.error('Помилка при очищенні шляху до Praat');
+    }
+  };
+
+  const handleCheckForUpdates = async () => {
+    setCheckingUpdate(true);
+    try {
+      const result = await versionsApi.checkForUpdates();
+      if (result && result.updateAvailable) {
+        setUpdateAvailable(true);
+        setUpdateInfo(result.updateInfo);
+        message.success('Доступне оновлення!');
+      } else {
+        setUpdateAvailable(false);
+        setUpdateInfo(null);
+        message.info('Ви використовуєте останню версію');
+      }
+    } catch (error) {
+      console.error('Failed to check for updates:', error);
+      message.error('Помилка при перевірці оновлень');
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
+
+  const handleDownloadUpdate = async () => {
+    setDownloadingUpdate(true);
+    try {
+      await versionsApi.downloadUpdate();
+      message.success('Оновлення завантажено! Перезапустіть додаток для встановлення.');
+    } catch (error) {
+      console.error('Failed to download update:', error);
+      message.error('Помилка при завантаженні оновлення');
+    } finally {
+      setDownloadingUpdate(false);
     }
   };
 
@@ -202,6 +247,40 @@ const Settings: React.FC = () => {
             <strong>Поточний шлях:</strong> {praatPath}
           </Paragraph>
         )}
+      </Card>
+
+      <Card title="Оновлення додатку" style={{ marginBottom: 24 }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Paragraph type="secondary" style={{ marginBottom: 16 }}>
+            <strong>Поточна версія:</strong> {currentVersion || "Завантаження..."}
+          </Paragraph>
+          <Space>
+            <Button 
+              icon={<SyncOutlined />}
+              onClick={handleCheckForUpdates}
+              loading={checkingUpdate}
+            >
+              Перевірити оновлення
+            </Button>
+            
+            {updateAvailable && (
+              <Button 
+                type="primary"
+                icon={<DownloadOutlined />}
+                onClick={handleDownloadUpdate}
+                loading={downloadingUpdate}
+              >
+                Завантажити оновлення
+              </Button>
+            )}
+          </Space>
+          
+          {updateInfo && (
+            <Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
+              <strong>Доступна версія:</strong> {updateInfo.version}
+            </Paragraph>
+          )}
+        </Space>
       </Card>
     </div>
   )

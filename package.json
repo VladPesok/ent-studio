@@ -1,11 +1,23 @@
 {
-  "name": "ent-ingest",
-  "version": "2.2.0",
+  "name": "ent-studio",
+  "version": "1.0.0",
   "main": "dist-electron/main/index.js",
-  "description": "ENT Ingest App",
-  "author": "草鞋没号 <308487730@qq.com>",
+  "description": "ENT Studio Application",
+  "author": "VladPesok",
   "license": "MIT",
   "private": true,
+  "repository": "https://github.com/VladPesok/ent-studio",
+  "build": {
+    "appId": "com.ent.studio",
+    "productName": "ENT-Studio",
+    "artifactName": "${productName}-${version}.${ext}",
+    "win": {
+      "target": "nsis"
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
   "debug": {
     "env": {
       "VITE_DEV_SERVER_URL": "http://127.0.0.1:7777/"
