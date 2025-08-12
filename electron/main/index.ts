@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, shell, dialog, ipcMain, Menu } from 'electron'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
@@ -40,6 +40,8 @@ async function createWindow() {
   win = new BrowserWindow({
     title: 'ENT Studio',
     icon: path.join(process.env.VITE_PUBLIC, 'favicon.ico'),
+    show: false, // Don't show until ready
+    backgroundColor: '#1f2937', // Dark background to prevent white flash
     webPreferences: {
       preload,
       // Warning: Enable nodeIntegration and disable contextIsolation is not secure in production
@@ -63,6 +65,11 @@ async function createWindow() {
     win?.webContents.send('main-process-message', new Date().toLocaleString())
   })
 
+  // Show window when ready to prevent white flash
+  win.once('ready-to-show', () => {
+    win?.show()
+  })
+
   // Make all links open with the browser, not with the application
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https:')) shell.openExternal(url)
@@ -76,6 +83,9 @@ async function createWindow() {
 app.whenReady().then(() => {
   createWindow();
   registerFsIpc(app, ipcMain, dialog);   // ← the ONLY line concerning FS
+  
+  // Remove default menu bar (File, Edit, View, etc.)
+  Menu.setApplicationMenu(null);
 });
 
 app.on('window-all-closed', () => {

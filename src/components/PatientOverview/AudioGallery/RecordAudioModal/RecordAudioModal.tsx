@@ -121,9 +121,11 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
         setAudioUrl(url);
 
         setFileExtension('.wav');
-        setFilename((prev) =>
-          (prev || generateDefaultFilename()).replace(/\.[^.]+$/, '') + '.wav'
-        );
+        setFilename((prev) => {
+          const currentName = prev || generateDefaultFilename();
+          // Remove any existing extension and don't add .wav since it's shown as suffix
+          return currentName.replace(/\.[^.]+$/, '');
+        });
 
         if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
       };

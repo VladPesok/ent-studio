@@ -199,20 +199,24 @@ const safeDOM = {
  * https://matejkustec.github.io/SpinThatShit
  */
 function useLoading() {
-  const className = `loaders-css__square-spin`
+  const className = `loaders-css__ent-spinner`
   const styleContent = `
-@keyframes square-spin {
-  25% { transform: perspective(100px) rotateX(180deg) rotateY(0); }
-  50% { transform: perspective(100px) rotateX(180deg) rotateY(180deg); }
-  75% { transform: perspective(100px) rotateX(0) rotateY(180deg); }
-  100% { transform: perspective(100px) rotateX(0) rotateY(0); }
+@keyframes ent-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
-.${className} > div {
-  animation-fill-mode: both;
-  width: 50px;
-  height: 50px;
-  background: #fff;
-  animation: square-spin 3s 0s cubic-bezier(0.09, 0.57, 0.49, 0.9) infinite;
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+.${className} {
+  width: 60px;
+  height: 60px;
+  border: 4px solid #374151;
+  border-top: 4px solid #2563eb;
+  border-radius: 50%;
+  animation: ent-spin 1s linear infinite;
+  margin-bottom: 24px;
 }
 .app-loading-wrap {
   position: fixed;
@@ -221,10 +225,25 @@ function useLoading() {
   width: 100vw;
   height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #282c34;
+  background: #1f2937;
   z-index: 9;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+.app-loading-title {
+  color: #f9fafb;
+  font-size: 28px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  animation: pulse 2s ease-in-out infinite;
+}
+.app-loading-subtitle {
+  color: #9ca3af;
+  font-size: 14px;
+  font-weight: 400;
+  margin-bottom: 32px;
 }
     `
   const oStyle = document.createElement('style')
@@ -233,7 +252,11 @@ function useLoading() {
   oStyle.id = 'app-loading-style'
   oStyle.innerHTML = styleContent
   oDiv.className = 'app-loading-wrap'
-  oDiv.innerHTML = `<div class="${className}"><div></div></div>`
+  oDiv.innerHTML = `
+    <div class="app-loading-title">ENT Studio</div>
+    <div class="app-loading-subtitle">Завантаження...</div>
+    <div class="${className}"></div>
+  `
 
   return {
     appendLoading() {
