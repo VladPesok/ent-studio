@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   BrowserRouter,
+  HashRouter,
   Routes,
   Route,
 } from "react-router-dom";
@@ -32,7 +33,6 @@ const AppShell: React.FC = () => {
 
   const { token } = useToken();
 
-  // Sync i18n language with app locale
   useEffect(() => {
     i18n.changeLanguage(locale);
   }, [locale, i18n]);
@@ -74,11 +74,11 @@ const AppShell: React.FC = () => {
 };
 
 const App: React.FC = () => (
-  <BrowserRouter>
+  <HashRouter>
     <AppConfigProvider>
       <AppShell />
     </AppConfigProvider>
-  </BrowserRouter>
+  </HashRouter>
 );
 
 export default App;

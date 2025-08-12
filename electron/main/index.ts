@@ -38,7 +38,7 @@ const indexHtml = path.join(RENDERER_DIST, 'index.html')
 
 async function createWindow() {
   win = new BrowserWindow({
-    title: 'Main window',
+    title: 'ENT Studio',
     icon: path.join(process.env.VITE_PUBLIC, 'favicon.ico'),
     webPreferences: {
       preload,
@@ -53,10 +53,10 @@ async function createWindow() {
 
   if (VITE_DEV_SERVER_URL) { // #298
     win.loadURL(VITE_DEV_SERVER_URL)
-    // Open devTool if the app is not packaged
     win.webContents.openDevTools()
   } else {
     win.loadFile(indexHtml)
+    win.webContents.openDevTools()
   }
 
   // Test actively push message to the Electron-Renderer
@@ -77,11 +77,6 @@ async function createWindow() {
 app.whenReady().then(() => {
   createWindow();
   registerFsIpc(app, ipcMain, dialog);   // ← the ONLY line concerning FS
-  
-  // App version handler
-  ipcMain.handle('get-app-version', () => {
-    return app.getVersion();
-  });
 });
 
 app.on('window-all-closed', () => {

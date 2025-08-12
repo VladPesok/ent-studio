@@ -3,10 +3,10 @@ import { createRequire } from 'node:module'
 import type {
   ProgressInfo,
   UpdateDownloadedEvent,
-  UpdateInfo,
 } from 'electron-updater'
 
 const { autoUpdater } = createRequire(import.meta.url)('electron-updater');
+
 
 export function update(win: Electron.BrowserWindow) {
 
@@ -14,17 +14,6 @@ export function update(win: Electron.BrowserWindow) {
   autoUpdater.autoDownload = false
   autoUpdater.disableWebInstaller = false
   autoUpdater.allowDowngrade = false
-
-  // start check
-  autoUpdater.on('checking-for-update', function () { })
-  // update available
-  autoUpdater.on('update-available', (arg: UpdateInfo) => {
-    win.webContents.send('update-can-available', { update: true, version: app.getVersion(), newVersion: arg?.version })
-  })
-  // update not available
-  autoUpdater.on('update-not-available', (arg: UpdateInfo) => {
-    win.webContents.send('update-can-available', { update: false, version: app.getVersion(), newVersion: arg?.version })
-  })
 
   // Checking for updates
   ipcMain.handle('check-update', async () => {
@@ -34,9 +23,26 @@ export function update(win: Electron.BrowserWindow) {
     }
 
     try {
-      return await autoUpdater.checkForUpdatesAndNotify()
-    } catch (error) {
-      return { message: 'Network error', error }
+      const result = await autoUpdater.checkForUpdatesAndNotify()
+      return result
+    } catch (error: any) {
+      console.error('Update check failed:', error)
+      
+      // Provide more specific error messages
+      let message = 'Network error'
+      if (error.message) {
+        if (error.message.includes('ENOTFOUND') || error.message.includes('ECONNREFUSED')) {
+          message = 'Cannot connect to update server. Please check your internet connection.'
+        } else if (error.message.includes('404')) {
+          message = 'Update server not found. The application may not be configured for automatic updates.'
+        } else if (error.message.includes('403') || error.message.includes('401')) {
+          message = 'Access denied to update server.'
+        } else {
+          message = `Update check failed: ${error.message}`
+        }
+      }
+      
+      return { message, error: error.message || error }
     }
   })
 
@@ -87,6 +93,10 @@ export function update(win: Electron.BrowserWindow) {
       isDownloading: false,     // This would need to be tracked during download
       isUpdateDownloaded: false // This would need to be tracked after download
     }
+  })
+
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion()
   })
 }
 
