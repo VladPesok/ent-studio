@@ -3,10 +3,17 @@ import { createRequire } from 'node:module'
 import type {
   ProgressInfo,
   UpdateDownloadedEvent,
+  UpdateInfo,
 } from 'electron-updater'
 
 const { autoUpdater } = createRequire(import.meta.url)('electron-updater');
 
+// Track update state at module level
+let updateState = {
+  isUpdateAvailable: false,
+  isDownloading: false,
+  isUpdateDownloaded: false
+}
 
 export function update(win: Electron.BrowserWindow) {
 
@@ -88,11 +95,36 @@ export function update(win: Electron.BrowserWindow) {
 
   // Get update status handler
   ipcMain.handle('get-update-status', () => {
-    return {
-      isUpdateAvailable: false, // This would need to be tracked based on update events
-      isDownloading: false,     // This would need to be tracked during download
-      isUpdateDownloaded: false // This would need to be tracked after download
-    }
+    return updateState
+  })
+
+  // Update event handlers to track state
+  autoUpdater.on('update-available', (info: UpdateInfo) => {
+    const currentVersion = app.getVersion()
+    const hasNewerVersion = isNewerVersion(info.version, currentVersion)
+    updateState.isUpdateAvailable = hasNewerVersion
+    win.webContents.send('update-can-available', { update: hasNewerVersion })
+  })
+
+  autoUpdater.on('update-not-available', () => {
+    updateState.isUpdateAvailable = false
+    win.webContents.send('update-can-available', { update: false })
+  })
+
+  autoUpdater.on('download-progress', (progressObj: ProgressInfo) => {
+    updateState.isDownloading = true
+    win.webContents.send('download-progress', progressObj)
+  })
+
+  autoUpdater.on('update-downloaded', () => {
+    updateState.isDownloading = false
+    updateState.isUpdateDownloaded = true
+    win.webContents.send('update-downloaded')
+  })
+
+  autoUpdater.on('error', (error: Error) => {
+    updateState.isDownloading = false
+    win.webContents.send('update-error', { message: error.message })
   })
 
   ipcMain.handle('get-app-version', () => {
@@ -100,12 +132,40 @@ export function update(win: Electron.BrowserWindow) {
   })
 }
 
+// Helper function to compare semantic versions
+function isNewerVersion(newVersion: string, currentVersion: string): boolean {
+  const parseVersion = (version: string) => {
+    return version.replace(/^v/, '').split('.').map(num => parseInt(num, 10))
+  }
+  
+  const newParts = parseVersion(newVersion)
+  const currentParts = parseVersion(currentVersion)
+  
+  for (let i = 0; i < Math.max(newParts.length, currentParts.length); i++) {
+    const newPart = newParts[i] || 0
+    const currentPart = currentParts[i] || 0
+    
+    if (newPart > currentPart) return true
+    if (newPart < currentPart) return false
+  }
+  
+  return false
+}
+
 function startDownload(
   callback: (error: Error | null, info: ProgressInfo | null) => void,
   complete: (event: UpdateDownloadedEvent) => void,
 ) {
+  updateState.isDownloading = true
   autoUpdater.on('download-progress', (info: ProgressInfo) => callback(null, info))
-  autoUpdater.on('error', (error: Error) => callback(error, null))
-  autoUpdater.on('update-downloaded', complete)
+  autoUpdater.on('error', (error: Error) => {
+    updateState.isDownloading = false
+    callback(error, null)
+  })
+  autoUpdater.on('update-downloaded', (event: UpdateDownloadedEvent) => {
+    updateState.isDownloading = false
+    updateState.isUpdateDownloaded = true
+    complete(event)
+  })
   autoUpdater.downloadUpdate()
 }

@@ -26,6 +26,12 @@ export interface UpdateProgress {
   total: number;
 }
 
+export interface UpdateListeners {
+  onDownloadProgress?: (progress: UpdateProgress) => void;
+  onUpdateDownloaded?: () => void;
+  onUpdateError?: (error: { message: string }) => void;
+}
+
 // Helper function to compare semantic versions
 function isNewerVersion(newVersion: string, currentVersion: string): boolean {
   const parseVersion = (version: string) => {
@@ -107,5 +113,25 @@ export const getAppVersion = async (): Promise<string> => {
   } catch (error) {
     console.error('Failed to get app version:', error);
     throw error;
+  }
+};
+
+export const setupUpdateListeners = (listeners: UpdateListeners): void => {
+  if (listeners.onDownloadProgress) {
+    window.ipcRenderer.on('download-progress', (_, progress: UpdateProgress) => {
+      listeners.onDownloadProgress?.(progress);
+    });
+  }
+  
+  if (listeners.onUpdateDownloaded) {
+    window.ipcRenderer.on('update-downloaded', () => {
+      listeners.onUpdateDownloaded?.();
+    });
+  }
+  
+  if (listeners.onUpdateError) {
+    window.ipcRenderer.on('update-error', (_, error: { message: string }) => {
+      listeners.onUpdateError?.(error);
+    });
   }
 };

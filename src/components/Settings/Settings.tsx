@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Typography, Divider, theme as antTheme, Form, Select, Card, message, Button, Input, Space } from "antd";
-import { FolderOpenOutlined, DeleteOutlined, DownloadOutlined, SyncOutlined } from "@ant-design/icons";
+import { Typography, Divider, theme as antTheme, Form, Select, Card, message, Button, Input, Space, Progress, Row, Col } from "antd";
+import { FolderOpenOutlined, DeleteOutlined, DownloadOutlined, SyncOutlined, CheckCircleOutlined } from "@ant-design/icons";
 import { useTranslation } from 'react-i18next';
 import * as configApi from "../../helpers/configApi";
 import * as versionsApi from "../../helpers/versionsApi";
@@ -22,6 +22,8 @@ const Settings: React.FC = () => {
   const [updateInfo, setUpdateInfo] = useState<any>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [downloadingUpdate, setDownloadingUpdate] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [updateDownloaded, setUpdateDownloaded] = useState(false);
   const [currentVersion, setCurrentVersion] = useState<string>("");
 
   useEffect(() => {
@@ -45,6 +47,24 @@ const Settings: React.FC = () => {
       }
     };
     loadSettings();
+
+    // Setup update progress listeners
+    versionsApi.setupUpdateListeners({
+      onDownloadProgress: (progress) => {
+        setDownloadProgress(Math.round(progress.percent));
+      },
+      onUpdateDownloaded: () => {
+        setDownloadingUpdate(false);
+        setUpdateDownloaded(true);
+        setDownloadProgress(100);
+        message.success('Оновлення завантажено! Натисніть "Встановити та перезапустити" для завершення.');
+      },
+      onUpdateError: (error) => {
+        setDownloadingUpdate(false);
+        setDownloadProgress(0);
+        message.error(`Помилка оновлення: ${error.message}`);
+      }
+    });
   }, []);
 
   const handleTabsChange = async (values: string[]) => {
@@ -142,14 +162,24 @@ const Settings: React.FC = () => {
 
   const handleDownloadUpdate = async () => {
     setDownloadingUpdate(true);
+    setDownloadProgress(0);
+    setUpdateDownloaded(false);
     try {
       await versionsApi.downloadUpdate();
-      message.success('Оновлення завантажено! Перезапустіть додаток для встановлення.');
     } catch (error) {
       console.error('Failed to download update:', error);
       message.error('Помилка при завантаженні оновлення');
-    } finally {
       setDownloadingUpdate(false);
+      setDownloadProgress(0);
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    try {
+      await versionsApi.installUpdate();
+    } catch (error) {
+      console.error('Failed to install update:', error);
+      message.error('Помилка при встановленні оновлення');
     }
   };
 
@@ -250,36 +280,47 @@ const Settings: React.FC = () => {
       </Card>
 
       <Card title="Оновлення додатку" style={{ marginBottom: 24 }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <Paragraph type="secondary" style={{ marginBottom: 16 }}>
-            <strong>Поточна версія:</strong> {currentVersion || "Завантаження..."}
+        <Space direction="vertical" style={{ width: '100%', rowGap: 0 }}>
+          <Paragraph>
+            <strong>📌 Поточна версія:</strong> {currentVersion || "Завантаження..."}
+            {updateInfo && updateAvailable && !updateDownloaded && (
+              <span> / <strong>🆕 Доступна версія:</strong> {updateInfo.version}</span>
+            )}
           </Paragraph>
+          
           <Space>
             <Button 
               icon={<SyncOutlined />}
               onClick={handleCheckForUpdates}
               loading={checkingUpdate}
+              disabled={downloadingUpdate || updateDownloaded}
             >
               Перевірити оновлення
             </Button>
             
-            {updateAvailable && (
+            {updateInfo && updateAvailable && !updateDownloaded && (
               <Button 
                 type="primary"
                 icon={<DownloadOutlined />}
                 onClick={handleDownloadUpdate}
                 loading={downloadingUpdate}
+                disabled={downloadingUpdate}
               >
                 Завантажити оновлення
               </Button>
             )}
+            
+            {updateDownloaded && (
+              <Button 
+                type="primary"
+                icon={<CheckCircleOutlined />}
+                onClick={handleInstallUpdate}
+                style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+              >
+                Встановити та перезапустити
+              </Button>
+            )}
           </Space>
-          
-          {updateInfo && (
-            <Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
-              <strong>Доступна версія:</strong> {updateInfo.version}
-            </Paragraph>
-          )}
         </Space>
       </Card>
     </div>
