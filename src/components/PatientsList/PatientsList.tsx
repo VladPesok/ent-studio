@@ -20,10 +20,7 @@ const { RangePicker } = DatePicker;
 
 const { useToken } = antTheme;
 
-export const splitName = (folder: string) => {
-  const [surname = "", name = "", dob = ""] = folder.split("_");
-  return { surname, name, dob };
-};
+
 
 const PatientsList: React.FC = () => {
   const [patients, setPatients] = useState<patientsApi.Patient[]>([]);
@@ -296,29 +293,37 @@ const PatientsList: React.FC = () => {
   const columns: ColumnsType<patientsApi.Patient & { key: string }> = [
     {
       title: "Прізвище та ім'я",
-      dataIndex: "folder",
+      dataIndex: "name",
       key: "name",
-      render: (folder) => {
-        const { surname, name } = splitName(folder);
-        return <span style={{cursor: 'pointer'}} className="patient-cell">{`${surname} ${name}`}</span>;
+      render: (name) => {
+        return <span style={{cursor: 'pointer'}} className="patient-cell">{name}</span>;
       },
       sorter: true,
       ...getColumnSearchProps('name', "Прізвище та ім'я"),
     },
     {
       title: "Дата народження",
-      dataIndex: "folder",
+      dataIndex: "birthdate",
       key: "bithdate",
       width: 240,
-      render: (f) => splitName(f).dob,
+      render: (birthdate) => {
+        if (!birthdate) return '';
+        const date = new Date(birthdate);
+        return date.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric' });
+      },
       sorter: true,
       ...getDateRangeProps('bithdate') as any,
     },
     {
       title: "Дата останнього прийому",
-      dataIndex: "date",
+      dataIndex: "latestAppointmentDate",
       key: "appointmentDate",
       width: 240,
+      render: (latestAppointmentDate) => {
+        if (!latestAppointmentDate) return '';
+        const dateObj = new Date(latestAppointmentDate);
+        return dateObj.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric' });
+      },
       sorter: true,
       ...getDateRangeProps('appointmentDate') as any,
     },
@@ -366,8 +371,11 @@ const PatientsList: React.FC = () => {
     },
   ];
 
-  const handleAdd = async (folderBase: string, date: string) => {
+  const handleAdd = async (folderBase: string, date: string, metadata: { doctor: string; diagnosis: string }) => {
     await patientsApi.makePatient(folderBase, date);
+    
+    await patientsApi.setPatient(folderBase, metadata);
+    
     setAddOpen(false);
     reloadPatients();
   };

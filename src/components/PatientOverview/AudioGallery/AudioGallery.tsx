@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons';
 import RecordAudioModal from './RecordAudioModal/RecordAudioModal';
 import * as configApi from "../../../helpers/configApi";
+import * as patientsApi from "../../../helpers/patientsApi";
 
 import "./AudioGallery.css";
 
@@ -64,7 +65,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
   const loadAudioFiles = useCallback(async () => {
     setLoading(true);
     try {
-      const files = await window.electronAPI.getAudioFiles(baseFolder, currentAppointment);
+      const files = await patientsApi.getAudioFiles(baseFolder, currentAppointment);
       setAudioFiles(files);
       setTotal(files.length);
     } catch (error) {
@@ -91,7 +92,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
 
   const handleLoadMoreAudio = async () => {
     try {
-      const result = await window.electronAPI.loadMoreAudio(baseFolder, currentAppointment);
+      const result = await patientsApi.loadMoreAudio(baseFolder, currentAppointment);
       if (result.success && result.count > 0) {
         loadAudioFiles();
       }
@@ -102,7 +103,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
 
   const handleOpenAudioFolder = async () => {
     try {
-      await window.electronAPI.openAudioFolder(baseFolder, currentAppointment);
+      await patientsApi.openAudioFolder(baseFolder, currentAppointment);
     } catch (error) {
       console.error("Failed to open audio folder:", error);
     }
@@ -117,7 +118,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
   const handleSaveRecording = async (audioBlob: Blob, filename: string) => {
     try {
       const arrayBuffer = await audioBlob.arrayBuffer();
-      const result = await window.electronAPI.saveRecordedAudio(
+      const result = await patientsApi.saveRecordedAudio(
         baseFolder, 
         currentAppointment, 
         arrayBuffer, 

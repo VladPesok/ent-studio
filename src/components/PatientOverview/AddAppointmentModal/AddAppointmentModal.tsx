@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, DatePicker, Input, Row, Col, Divider, Typography } from 'antd';
+import { Modal, Form, DatePicker, Input, Row, Col, Divider, Typography, Select } from 'antd';
 import { CalendarOutlined, MedicineBoxOutlined, FileTextOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/uk';
@@ -16,7 +16,7 @@ interface AddAppointmentModalProps {
   onCancel: () => void;
   onSubmit: (data: {
     date: string;
-    doctor: string;
+    doctors: string[];
     diagnosis: string;
     notes: string;
   }) => void;
@@ -39,6 +39,8 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
+  const [doctorsList, setDoctorsList] = useState<string[]>(doctors);
+  const [diagnosesList, setDiagnosesList] = useState<string[]>(diagnoses);
 
   // Get today's date
   const today = dayjs().format('YYYY-MM-DD');
@@ -83,8 +85,8 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
       
       onSubmit({
         date: values.date.format('YYYY-MM-DD'),
-        doctor: values.doctor || '',
-        diagnosis: values.diagnosis || '',
+        doctors: Array.isArray(values.doctor) ? values.doctor : (values.doctor ? [values.doctor] : []),
+        diagnosis: Array.isArray(values.diagnosis) ? values.diagnosis : (values.diagnosis ? [values.diagnosis] : []),
         notes: values.notes || '',
       });
     } catch (error) {
@@ -169,14 +171,23 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
-                  label="Лікар"
+                  label="Лікарі"
                   name="doctor"
                 >
-                  <CreatableSelect
+                  <Select
+                    mode="tags"
                     value={form.getFieldValue('doctor')}
-                    onChange={(value) => form.setFieldsValue({ doctor: value })}
-                    items={Array.isArray(doctors) ? doctors : []}
-                    onCreate={handleDoctorCreate}
+                    onChange={(value) => {
+                      form.setFieldsValue({ doctor: value });
+                      if (Array.isArray(value)) {
+                        const newDoctors = value.filter(v => !doctorsList.includes(v));
+                        if (newDoctors.length > 0) {
+                          setDoctorsList([...doctorsList, ...newDoctors]);
+                          newDoctors.forEach(handleDoctorCreate);
+                        }
+                      }
+                    }}
+                    options={doctorsList.map(doctor => ({ label: doctor, value: doctor }))}
                     placeholder="Оберіть або введіть лікаря"
                     style={{ width: '100%' }}
                   />
@@ -188,7 +199,7 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
                   label="Діагноз"
                   name="diagnosis"
                 >
-                  <CreatableSelect
+                 <CreatableSelect
                     value={form.getFieldValue('diagnosis')}
                     onChange={(value) => form.setFieldsValue({ diagnosis: value })}
                     items={Array.isArray(diagnoses) ? diagnoses : []}

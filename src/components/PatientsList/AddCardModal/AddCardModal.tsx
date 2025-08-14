@@ -4,7 +4,6 @@ import { UserOutlined, CalendarOutlined, MedicineBoxOutlined } from "@ant-design
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/uk";
 import { getDictionaries, addDictionaryEntry } from "../../../helpers/configApi";
-import { setPatient } from "../../../helpers/patientsApi";
 import CreatableSelect from "../../../common/input/CreatableSelect";
 import "./AddCardModal.css";
 
@@ -13,7 +12,7 @@ dayjs.locale("uk");
 const { Title, Text } = Typography;
 
 interface Props {
-  onOk(folderBase: string, visitDate: string): void;
+  onOk(folderBase: string, visitDate: string, metadata: { doctor: string; diagnosis: string }): Promise<void>;
   onClose(): void;
 }
 
@@ -78,20 +77,11 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
       const v = await form.validateFields();
       const folderBase = `${v.surname.trim()}_${v.name.trim()}_${fmt(v.dob)}`;
       
-      // Create patient first
-      await onOk(folderBase, fmt(v.visitDate));
-      
-      // Save patient metadata if provided
-      if (v.doctor || v.diagnosis) {
-        try {
-          await setPatient(folderBase, {
-            doctor: v.doctor || "",
-            diagnosis: v.diagnosis || ""
-          });
-        } catch (error) {
-          console.error("Failed to save patient metadata:", error);
-        }
-      }
+      // Pass metadata to parent component for proper sequencing
+      await onOk(folderBase, fmt(v.visitDate), {
+        doctor: v.doctor || "",
+        diagnosis: v.diagnosis || ""
+      });
     } catch {
       // Form validation failed
     } finally {

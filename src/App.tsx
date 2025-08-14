@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  BrowserRouter,
   HashRouter,
   Routes,
   Route,
@@ -45,7 +44,7 @@ const AppShell: React.FC = () => {
         token: { colorPrimary: "#2563eb" },
       }}
     >
-      <Layout style={{ minHeight: "100vh" }}>
+      <Layout className="app-container">
         <AppSider collapsed={collapsed} />
         <Layout>
           <AppHeader
@@ -53,7 +52,7 @@ const AppShell: React.FC = () => {
             onToggle={() => setCollapsed(!collapsed)}
             token={token}
           />
-          <Content>
+          <Content className="app-content">
             <Routes>
               <Route
                 path="/patients"

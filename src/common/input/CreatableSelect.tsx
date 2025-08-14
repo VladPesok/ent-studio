@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Select, Input } from "antd";
 
 interface Props {
@@ -29,18 +29,34 @@ const CreatableSelect: React.FC<Props> = ({
   /* popup / search state */
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  // Callback ref for immediate focus when input is rendered
+  const inputRef = useRef<any>(null);
+  const setInputRef = (element: any) => {
+    inputRef.current = element;
+    if (element && open) {
+      element.focus();
+    }
+  };
 
   /* build option list (dedup, case-insensitive) */
   const trimmed = search.trim();
   const lcItems = items.map((i) => i.toLowerCase());
   const showExtra = trimmed && !lcItems.includes(trimmed.toLowerCase());
 
+  // Filter existing items based on search input
+  const filteredItems = useMemo(() => {
+    if (!trimmed) return items;
+    return items.filter(item => 
+      item.toLowerCase().includes(trimmed.toLowerCase())
+    );
+  }, [items, trimmed]);
+
   const options = useMemo(
     () => [
-      ...items.map((u) => ({ value: u, label: u })),
+      ...filteredItems.map((u) => ({ value: u, label: u })),
       ...(showExtra ? [{ value: trimmed, label: trimmed }] : []),
     ],
-    [items, trimmed, showExtra],
+    [filteredItems, trimmed, showExtra],
   );
 
   /* helpers */
@@ -69,7 +85,9 @@ const CreatableSelect: React.FC<Props> = ({
       onClear={() => onChange(null)}
       onOpenChange={(v) => {
         setOpen(v);
-        if (!v) setSearch("");
+        if (!v) {
+          setSearch("");
+        }
       }}
       options={options}
       onChange={selectItem}
@@ -77,11 +95,11 @@ const CreatableSelect: React.FC<Props> = ({
         <>
           <div style={{ padding: 8 }}>
             <Input
+              ref={setInputRef}
               placeholder="Search / add…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onPressEnter={handleEnter}
-              autoFocus
             />
           </div>
           {menu}

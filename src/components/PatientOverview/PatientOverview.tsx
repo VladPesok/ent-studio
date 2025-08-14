@@ -9,7 +9,7 @@ import {
   Button,
   Tabs,
   List,
-  Space,
+  Select,
   Typography,
   Tooltip,
   message,
@@ -67,7 +67,7 @@ const PatientOverview: React.FC = () => {
     voiceReport: [] as any[],
   });
   const [currentAppointmentForm, setCurrentAppointmentForm] = useState({
-    doctor: "",
+    doctors: [],
     diagnosis: "",
     notes: "",
   });
@@ -149,21 +149,26 @@ const PatientOverview: React.FC = () => {
 
 
   const handleAppointmentChange = async (appointmentDate: string) => {
+    // Skip reload if clicking on the current appointment
+    if (currentAppointment === appointmentDate) {
+      return;
+    }
+    
     setCurrentAppointment(appointmentDate);
     setCurrentAppointmentLoading(true);
     
     // Load appointment-specific data from appointment.config
     try {
-      const appointmentData = await window.electronAPI.getPatientAppointment(`${folder}/${appointmentDate}`);
+      const appointmentData = await patientsApi.getPatientAppointment(`${folder}/${appointmentDate}`);
       setCurrentAppointmentForm({
-        doctor: appointmentData.doctor || "",
+        doctors: appointmentData.doctors || [],
         diagnosis: appointmentData.diagnosis || "",
         notes: appointmentData.notes || "",
       });
     } catch (error) {
       // If appointment data doesn't exist, use defaults
       setCurrentAppointmentForm({
-        doctor: "",
+        doctors: [],
         diagnosis: "",
         notes: "",
       });
@@ -174,7 +179,7 @@ const PatientOverview: React.FC = () => {
 
   const handleCreateAppointment = async (appointmentData: {
     date: string;
-    doctor: string;
+    doctors: string[];
     diagnosis: string;
     notes: string;
   }) => {
@@ -182,11 +187,11 @@ const PatientOverview: React.FC = () => {
       setPatientInfoLoading(true);
       
       // Create the appointment folder
-      await window.electronAPI.makePatient(folder, appointmentData.date);
+      await patientsApi.makePatient(folder, appointmentData.date);
       
       // Save appointment-specific data
       await patientsApi.setPatientAppointments(`${folder}/${appointmentData.date}`, {
-        doctor: appointmentData.doctor,
+        doctors: appointmentData.doctors,
         diagnosis: appointmentData.diagnosis,
         notes: appointmentData.notes,
       });
@@ -212,7 +217,7 @@ const PatientOverview: React.FC = () => {
 
   const handleOpenPatientFolder = async () => {
     try {
-      await window.electronAPI.openPatientFolderInFs(folder);
+      await patientsApi.openPatientFolderInFs(folder);
     } catch (error) {
       console.error('Failed to open patient folder:', error);
     }
@@ -221,7 +226,7 @@ const PatientOverview: React.FC = () => {
   const handleOpenAppointmentFolder = async () => {
     if (currentAppointment) {
       try {
-        await window.electronAPI.openPatientFolderInFs(`${folder}/${currentAppointment}`);
+        await patientsApi.openPatientFolderInFs(`${folder}/${currentAppointment}`);
       } catch (error) {
         console.error('Failed to open appointment folder:', error);
       }
@@ -230,9 +235,9 @@ const PatientOverview: React.FC = () => {
 
   const handleDoctorCreate = async (newDoctor: string) => {
     try {
-      await window.electronAPI.addDictionaryEntry('doctors', newDoctor);
+      await configApi.addDictionaryEntry('doctors', newDoctor);
       // Refresh dictionaries
-      const newDicts = await window.electronAPI.getDictionaries();
+      const newDicts = await configApi.getDictionaries();
       setDicts(newDicts);
     } catch (error) {
       console.error('Failed to add doctor:', error);
@@ -241,9 +246,9 @@ const PatientOverview: React.FC = () => {
 
   const handleDiagnosisCreate = async (newDiagnosis: string) => {
     try {
-      await window.electronAPI.addDictionaryEntry('diagnosis', newDiagnosis);
+      await configApi.addDictionaryEntry('diagnosis', newDiagnosis);
       // Refresh dictionaries
-      const newDicts = await window.electronAPI.getDictionaries();
+      const newDicts = await configApi.getDictionaries();
       setDicts(newDicts);
     } catch (error) {
       console.error('Failed to add diagnosis:', error);
@@ -257,9 +262,9 @@ const PatientOverview: React.FC = () => {
     // Auto-save doctor, diagnosis, and notes to appointment.config (appointment-level)
     if (currentAppointment) {
       try {
-        const appointmentConfigData: { doctor?: string; diagnosis?: string; notes?: string } = {};
+        const appointmentConfigData: { doctors?: string[]; diagnosis?: string; notes?: string } = {};
         
-        if ('doctor' in patch) appointmentConfigData.doctor = newForm.doctor;
+        if ('doctors' in patch) appointmentConfigData.doctors = newForm.doctors;
         if ('diagnosis' in patch) appointmentConfigData.diagnosis = newForm.diagnosis;
         if ('notes' in patch) appointmentConfigData.notes = newForm.notes;
         
@@ -381,7 +386,7 @@ const PatientOverview: React.FC = () => {
             }
           >
             <Form layout="vertical">
-              <Form.Item label="Основний лікар">
+              <Form.Item label="Ведучий лікар">
                 <CreatableSelect
                   value={form.doctor || null}
                   items={Array.isArray(dicts.doctors) ? dicts.doctors : []}
@@ -464,18 +469,25 @@ const PatientOverview: React.FC = () => {
               }
             >
               <Form layout="vertical">
-                <Form.Item label="Лікар на прийомі">
-                  <CreatableSelect
-                    value={currentAppointmentForm.doctor || null}
-                    items={Array.isArray(dicts.doctors) ? dicts.doctors : []}
-                    onChange={(val) => updateAppointmentField({ doctor: val || "" })}
-                    onCreate={handleDoctorCreate}
+                <Form.Item label="Лікарі на прийомі">
+                  <Select
+                    mode="tags"
+                    value={currentAppointmentForm.doctors || []}
+                    options={Array.isArray(dicts.doctors) ? dicts.doctors.map(doctor => ({ value: doctor, label: doctor })) : []}
+                    onChange={async (val) => {
+                      // Handle new doctor creation
+                      const newDoctors = val.filter(doctor => !dicts.doctors.includes(doctor));
+                      for (const newDoctor of newDoctors) {
+                        await handleDoctorCreate(newDoctor);
+                      }
+                      updateAppointmentField({ doctors: val || [] });
+                    }}
                     placeholder="Обрати або додати лікаря..."
                     style={{ width: '100%' }}
                   />
                 </Form.Item>
 
-                <Form.Item label="Поточний діагноз">
+                <Form.Item label="Діагноз станом на дату прийому">
                   <CreatableSelect
                     value={currentAppointmentForm.diagnosis || null}
                     items={Array.isArray(dicts.diagnosis) ? dicts.diagnosis : []}

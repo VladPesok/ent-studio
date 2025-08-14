@@ -1,6 +1,9 @@
 import fs from "fs/promises";
 import path, { extname } from "path";
+
+import { app, ipcMain, dialog } from 'electron'
 import type { App, Dialog, IpcMain } from "electron";
+
 import { shell } from "electron";
 import { spawn, execFile  } from "child_process";
 
@@ -62,6 +65,11 @@ const latestDate = async (patientRoot: string) => {
     .pop() || "";
 };
 
+const parsePatientFolder = (folder: string) => {
+  const [surname = "", name = "", dob = ""] = folder.split("_");
+  return { surname, name, dob };
+};
+
 const buildProjects = async (patientsRoot: string) => {
   const dirs = await fs.readdir(patientsRoot, { withFileTypes: true });
   return Promise.all(
@@ -78,11 +86,16 @@ const buildProjects = async (patientsRoot: string) => {
           // If patient.config doesn't exist or is invalid, use defaults
         }
         
+        const { surname, name, dob } = parsePatientFolder(d.name);
+        const latestAppointmentDate = await latestDate(path.join(patientsRoot, d.name));
+        
         return {
-          folder: d.name,
-          date: await latestDate(path.join(patientsRoot, d.name)),
+          name: `${surname} ${name}`.trim(),
+          birthdate: dob,
+          latestAppointmentDate,
           doctor: patientConfig.doctor || "",
-          diagnosis: patientConfig.diagnosis || ""
+          diagnosis: patientConfig.diagnosis || "",
+          folder: d.name // Keep folder for backward compatibility
         };
       }),
   );
@@ -104,19 +117,15 @@ const latestAppointmentDir = async (patientsRoot: string, folder: string) => {
   return path.join(patientsRoot, folder, dates);
 };
 
-export const registerFsIpc = (
-  app: App,
-  ipc: IpcMain,
-  dialog: Dialog,
-): void => {
+export const setFsOperations = (): void => {
   const patientsRoot = makePatientsRoot(app);
 
-  ipc.handle("getProjects", async () => {
+  ipcMain.handle("getProjects", async () => {
     await ensureDir(patientsRoot);
     return buildProjects(patientsRoot);
   });
 
-  ipc.handle("scanUsb", async () => {
+  ipcMain.handle("scanUsb", async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openDirectory"],
     });
@@ -163,12 +172,12 @@ export const registerFsIpc = (
     ] as { name: string; folder: string }[],
   };
 
-  ipc.handle("dict:get", async () => {
+  ipcMain.handle("dict:get", async () => {
     const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
     return cfg.dictionaries;
   });
 
-  ipc.handle(
+  ipcMain.handle(
     "dict:add",
     async (_e, type: "doctors" | "diagnosis", value: string) => {
       const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
@@ -179,31 +188,31 @@ export const registerFsIpc = (
     },
   );
 
-  ipc.handle("settings:get", async () => {
+  ipcMain.handle("settings:get", async () => {
     const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
     return cfg.settings;
   });
-  ipc.handle("settings:set", async (_e, patch) => {
+  ipcMain.handle("settings:set", async (_e, patch) => {
     const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
     cfg.settings = { ...cfg.settings, ...patch };
     await saveJson(appCfg(), cfg);
   });
 
-  ipc.handle("session:get", async () => {
+  ipcMain.handle("session:get", async () => {
     const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
     return cfg.session;
   });
-  ipc.handle("session:set", async (_e, patch) => {
+  ipcMain.handle("session:set", async (_e, patch) => {
     const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
     cfg.session = { ...cfg.session, ...patch };
     await saveJson(appCfg(), cfg);
   });
 
-  ipc.handle("shownTabs:get", async () => {
+  ipcMain.handle("shownTabs:get", async () => {
     const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
     return cfg.shownTabs;
   });
-  ipc.handle("shownTabs:set", async (_e, tabs) => {
+  ipcMain.handle("shownTabs:set", async (_e, tabs) => {
     const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
     cfg.shownTabs = tabs;
     await saveJson(appCfg(), cfg);
@@ -214,10 +223,10 @@ export const registerFsIpc = (
   };
 
   // Patient-level config (main doctor/diagnosis)
-  ipc.handle("patient:getMeta", async (_e, folder: string) =>
+  ipcMain.handle("patient:getMeta", async (_e, folder: string) =>
     ensureJson(patientCfg(folder), { doctor: "", diagnosis: "" }),
   );
-  ipc.handle("patient:setMeta", async (_e, folder: string, data: any) => {
+  ipcMain.handle("patient:setMeta", async (_e, folder: string, data: any) => {
     const file = patientCfg(folder);
     const cur = await ensureJson(file, {});
     await saveJson(file, { ...cur, ...data });
@@ -225,7 +234,7 @@ export const registerFsIpc = (
 
 
 
-  ipc.handle("patient:appointments", async (_e, folder: string) => {
+  ipcMain.handle("patient:appointments", async (_e, folder: string) => {
     const patientRoot = path.join(patientsRoot, folder);
     try {
       const entries = await fs.readdir(patientRoot, { withFileTypes: true });
@@ -235,11 +244,11 @@ export const registerFsIpc = (
         if (entry.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(entry.name)) {
           const appointmentDir = path.join(patientRoot, entry.name);
           const configFile = path.join(appointmentDir, "appointment.config");
-          const config = await ensureJson(configFile, { doctor: "", diagnosis: "", notes: "" });
+          const config = await ensureJson(configFile, { doctors: "", diagnosis: "", notes: "" });
           
           appointments.push({
             date: entry.name,
-            doctor: config.doctor || "",
+            doctors: config.doctors || [],
             diagnosis: config.diagnosis || ""
           });
         }
@@ -253,34 +262,35 @@ export const registerFsIpc = (
   });
 
   // Get appointment-specific data from appointment.config
-  ipc.handle("patient:getAppointment", async (_e, appointmentPath: string) => {
+  ipcMain.handle("patient:getAppointment", async (_e, appointmentPath: string) => {
     const configFile = path.join(patientsRoot, appointmentPath, "appointment.config");
-    return ensureJson(configFile, { doctor: "", diagnosis: "", notes: "" });
+    return ensureJson(configFile, { doctors: [] as string[], diagnosis: "", notes: "" });
   });
 
   // Save appointment-specific data to appointment.config
-  ipc.handle("patient:setAppointment", async (_e, appointmentPath: string, data: any) => {
+  ipcMain.handle("patient:setAppointment", async (_e, appointmentPath: string, data: any) => {
     const configFile = path.join(patientsRoot, appointmentPath, "appointment.config");
-    const cur = await ensureJson(configFile, { doctor: "", diagnosis: "", notes: "" });
+    const cur = await ensureJson(configFile, { doctors: [] as string[], diagnosis: "", notes: "" });
+
     await saveJson(configFile, { ...cur, ...data });
   });
 
   /* ---------- live counts & clips ---------- */
-  ipc.handle("patient:counts", async (_e, folder: string) => {
+  ipcMain.handle("patient:counts", async (_e, folder: string) => {
     const apptDir   = await latestAppointmentDir(patientsRoot, folder);
     const videoDir  = path.join(apptDir, "video");
     const video     = await listDirClips(videoDir);
     return { videoCount: video.length };
   });
 
-  ipc.handle("patient:clips", async (_e, folder: string) => {
+  ipcMain.handle("patient:clips", async (_e, folder: string) => {
     const apptDir  = await latestAppointmentDir(patientsRoot, folder);
     const videoDir = path.join(apptDir, "video");
     const toUrl    = (p: string) => `file://${p}`;
     return { video: (await listDirClips(videoDir)).map(toUrl) };
   });
 
-  ipc.handle("patient:new", async (_e, base: string, date: string) => {
+  ipcMain.handle("patient:new", async (_e, base: string, date: string) => {
     const pRoot = path.join(patientsRoot, base);
     const appt  = path.join(pRoot, date, "video");
     await ensureDir(appt);
@@ -295,13 +305,13 @@ export const registerFsIpc = (
     await fs.writeFile(path.join(pRoot, date, "appointment.config"), "{}", "utf8");
   });
 
-  ipc.handle("patient:openFolder", async (_e, folder: string) => {
+  ipcMain.handle("patient:openFolder", async (_e, folder: string) => {
     const dir = path.join(patientsRoot, folder);
     return shell.openPath(dir);     // resolves to "" on success or error-string
   });
 
   // Enhanced clips with pagination and audio detection
-  ipc.handle("patient:clipsDetailed", async (_e, folder: string, offset: number = 0, limit: number = 12) => {
+  ipcMain.handle("patient:clipsDetailed", async (_e, folder: string, offset: number = 0, limit: number = 12) => {
     const apptDir = await latestAppointmentDir(patientsRoot, folder);
     const videoDir = path.join(apptDir, "video");
     const allClips = await listDirClips(videoDir);
@@ -337,7 +347,7 @@ export const registerFsIpc = (
   });
 
   // Load more videos from external sources
-  ipc.handle("patient:loadMoreVideos", async (_e, folder: string) => {
+  ipcMain.handle("patient:loadMoreVideos", async (_e, folder: string) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile", "multiSelections"],
       filters: [
@@ -372,7 +382,7 @@ export const registerFsIpc = (
   });
 
   // CustomTab file operations
-  ipc.handle("getCustomTabFiles", async (_e, folder: string, tabFolder: string, currentAppointment?: string) => {
+  ipcMain.handle("getCustomTabFiles", async (_e, folder: string, tabFolder: string, currentAppointment?: string) => {
     let targetDir: string;
     
     if (currentAppointment) {
@@ -410,7 +420,7 @@ export const registerFsIpc = (
     }
   });
 
-  ipc.handle("selectAndCopyFiles", async (_e, folder: string, tabFolder: string, currentAppointment?: string) => {
+  ipcMain.handle("selectAndCopyFiles", async (_e, folder: string, tabFolder: string, currentAppointment?: string) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile", "multiSelections"],
       filters: [
@@ -448,7 +458,7 @@ export const registerFsIpc = (
     return { success: true, count: copiedCount };
   });
 
-  ipc.handle("openFileInDefaultApp", async (_e, filePath: string) => {
+  ipcMain.handle("openFileInDefaultApp", async (_e, filePath: string) => {
     try {
       const result = await shell.openPath(filePath);
       if (result === "") {
@@ -485,7 +495,7 @@ export const registerFsIpc = (
   });
 
   // Audio file operations
-  ipc.handle("patient:audioFiles", async (_e, folder: string, currentAppointment?: string) => {
+  ipcMain.handle("patient:audioFiles", async (_e, folder: string, currentAppointment?: string) => {
     let audioDir: string;
     
     if (currentAppointment) {
@@ -532,7 +542,7 @@ export const registerFsIpc = (
     }
   });
 
-  ipc.handle("patient:loadMoreAudio", async (_e, folder: string, currentAppointment?: string) => {
+  ipcMain.handle("patient:loadMoreAudio", async (_e, folder: string, currentAppointment?: string) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile", "multiSelections"],
       filters: [
@@ -572,7 +582,7 @@ export const registerFsIpc = (
     return { success: true, count: copiedCount };
   });
 
-  ipc.handle("patient:openAudioFolder", async (_e, folder: string, currentAppointment?: string) => {
+  ipcMain.handle("patient:openAudioFolder", async (_e, folder: string, currentAppointment?: string) => {
     let audioDir: string;
     
     if (currentAppointment) {
@@ -586,7 +596,7 @@ export const registerFsIpc = (
     return shell.openPath(audioDir);
   });
 
-  ipc.handle("patient:saveRecordedAudio", async (_e, folder: string, currentAppointment: string | undefined, audioBuffer: ArrayBuffer, filename: string) => {
+  ipcMain.handle("patient:saveRecordedAudio", async (_e, folder: string, currentAppointment: string | undefined, audioBuffer: ArrayBuffer, filename: string) => {
     try {
       let audioDir: string;
       
@@ -618,7 +628,7 @@ export const registerFsIpc = (
   });
 
   // Praat integration handlers
-  ipc.handle("praat:selectExecutable", async () => {
+  ipcMain.handle("praat:selectExecutable", async () => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile"],
       filters: [
@@ -694,7 +704,7 @@ export const registerFsIpc = (
     child.unref();
   }
 
-  ipc.handle("praat:openFile", async (_e, praatPath: string, audioFilePath: string) => {
+  ipcMain.handle("praat:openFile", async (_e, praatPath: string, audioFilePath: string) => {
     try {
       // Basic checks + helpful diagnostics
       if (!praatPath || !audioFilePath) {

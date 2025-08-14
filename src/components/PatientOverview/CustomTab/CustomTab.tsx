@@ -14,6 +14,7 @@ import {
   FileWordOutlined,
   FilePptOutlined
 } from '@ant-design/icons';
+import * as patientsApi from '../../../helpers/patientsApi';
 import './CustomTab.css';
 
 interface CustomTabProps {
@@ -100,8 +101,8 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
   const loadFiles = async () => {
     setLoading(true);
     try {
-      const customFiles = await window.electronAPI.getCustomTabFiles(baseFolder, tabName, currentAppointment);
-      setFiles((customFiles || []).map(file => ({
+      const customFiles = await patientsApi.getCustomTabFiles(baseFolder, tabName, currentAppointment);
+      setFiles((customFiles || []).map((file: CustomFile) => ({
         ...file,
         type: file.extension.substring(1)
       })));
@@ -115,7 +116,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
 
   const handleAddFiles = async () => {
     try {      
-      const result = await window.electronAPI.selectAndCopyFiles(baseFolder, tabName, currentAppointment);
+      const result = await patientsApi.selectAndCopyFiles(baseFolder, tabName, currentAppointment);
       if (result.success && result.count > 0) {
         message.success(`Додано ${result.count} файл(ів)`);
         loadFiles();
@@ -132,7 +133,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
         ? `${baseFolder}/${currentAppointment}/${tabFolder}`
         : `${baseFolder}/${tabFolder}`;
       
-      await window.electronAPI.openPatientFolderInFs(folderPath);
+      await patientsApi.openPatientFolderInFs(folderPath);
     } catch (error) {
       console.error("Failed to open folder:", error);
       message.error("Помилка відкриття папки");
@@ -141,7 +142,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
 
   const handleOpenFile = async (filePath: string) => {
     try {
-      await window.electronAPI.openFileInDefaultApp(filePath);
+      await patientsApi.openFileInDefaultApp(filePath);
     } catch (error) {
       console.error("Failed to open file:", error);
       message.error("Помилка відкриття файлу");
@@ -161,7 +162,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
 
   if (!loading && files.length === 0) {
     return (
-      <div className="custom-tab-wrap">
+      <div className="custom-tab-empty-wrap">
         <div className="empty-state">
           <div className="empty-icon">📁</div>
           <h3>Немає файлів</h3>

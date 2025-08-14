@@ -3,9 +3,9 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import os from 'node:os'
-import { update } from './update'
 
-import { registerFsIpc } from "../../helpers/fs";
+import { setAutoUpdater } from './autoUpdater'
+import { setFsOperations } from "./fs"
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -76,15 +76,12 @@ async function createWindow() {
     return { action: 'deny' }
   })
 
-  // Auto update
-  update(win)
+  setAutoUpdater(win);
+  setFsOperations();
 }
 
 app.whenReady().then(() => {
   createWindow();
-  registerFsIpc(app, ipcMain, dialog);   // ← the ONLY line concerning FS
-  
-  // Remove default menu bar (File, Edit, View, etc.)
   Menu.setApplicationMenu(null);
 });
 

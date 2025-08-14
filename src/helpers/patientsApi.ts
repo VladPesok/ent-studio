@@ -1,9 +1,11 @@
 // All patient-related IPC calls live here
 export interface Patient {
-  folder: string;
-  date: string;
+  name: string;
+  birthdate: string;
+  latestAppointmentDate: string;
   doctor: string;
   diagnosis: string;
+  folder: string; // Keep for backward compatibility
 }
 
 export interface Appointment {
@@ -60,8 +62,8 @@ export interface PaginatedResult<T> {
 }
 
 export const getPatients = async (filters?: PatientFilters): Promise<PaginatedResult<Patient>> => {
-  const allPatients = await window.electronAPI.getProjects();
-  
+  const allPatients = await window.ipcRenderer.invoke("getProjects");
+
   let filteredPatients = allPatients;
 
   if (filters) {
@@ -69,17 +71,14 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
       // Search filter (legacy search input)
       if (filters.search) {
         const term = filters.search.trim().toLowerCase();
-        const { surname, name } = parsePatientFolder(patient.folder);
-        const matchesSearch = surname.toLowerCase().includes(term) || name.toLowerCase().includes(term);
+        const matchesSearch = patient.name.toLowerCase().includes(term);
         if (!matchesSearch) return false;
       }
       
       // Name filter (from column filter)
       if (filters.name) {
-        console.log(filters.name)
         const term = filters.name.toLowerCase();
-        const { surname, name } = parsePatientFolder(patient.folder);
-        const fullName = `${surname} ${name}`.toLowerCase();
+        const fullName = patient.name.toLowerCase();
         if (!fullName.includes(term)) return false;
       }
       
@@ -87,10 +86,11 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
       if (filters.bithdate && Array.isArray(filters.bithdate)) {
         const [start, end] = filters.bithdate;
         if (start || end) {
-          const dobString = parsePatientFolder(patient.folder).dob;
+          const dobString = patient.birthdate;
           if (!dobString) return false;
           
-          const [day, month, year] = dobString.split('.');
+          // Parse birthdate in YYYY-MM-DD format
+          const [year, month, day] = dobString.split('-');
           if (!day || !month || !year) return false;
           
           const dobDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
@@ -109,7 +109,7 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
       if (filters.appointmentDate && Array.isArray(filters.appointmentDate)) {
         const [start, end] = filters.appointmentDate;
         if (start || end) {
-          const visitDate = new Date(patient.date);
+          const visitDate = new Date(patient.latestAppointmentDate);
           
           if (start && !end) {
             if (visitDate < start.startOf('day').toDate()) return false;
@@ -141,48 +141,49 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
       let valueA: any;
       let valueB: any;
       
+      let comparison: number;
+      
       switch (filters.sortField) {
-        case 'pn': // Patient name
-          const nameA = parsePatientFolder(a.folder);
-          const nameB = parsePatientFolder(b.folder);
-          valueA = `${nameA.surname} ${nameA.name}`;
-          valueB = `${nameB.surname} ${nameB.name}`;
+        case 'name': // Patient name
+          valueA = a.name;
+          valueB = b.name;
+          comparison = String(valueA).localeCompare(String(valueB));
           break;
-        case 'dob': // Date of birth
-          valueA = parsePatientFolder(a.folder).dob;
-          valueB = parsePatientFolder(b.folder).dob;
+        case 'birthdate': // Date of birth
+          // Parse YYYY-MM-DD format explicitly
+          const [yearA, monthA, dayA] = a.birthdate.split('-').map(Number);
+          const [yearB, monthB, dayB] = b.birthdate.split('-').map(Number);
+
+          valueA = new Date(yearA, monthA - 1, dayA).getTime();
+          valueB = new Date(yearB, monthB - 1, dayB).getTime();
+
+          comparison = valueA - valueB;
           break;
-        case 'visit': // Visit date
-          valueA = new Date(a.date).getTime();
-          valueB = new Date(b.date).getTime();
-          break;
-        case 'doc': // Doctor
+        case 'doctor': // Doctor
           valueA = a.doctor || '';
           valueB = b.doctor || '';
+          comparison = String(valueA).localeCompare(String(valueB));
           break;
-        case 'diag': // Diagnosis
+        case 'diagnosis': // Diagnosis
           valueA = a.diagnosis || '';
           valueB = b.diagnosis || '';
+          comparison = String(valueA).localeCompare(String(valueB));
           break;
+        case 'appointmentDate':
         default:
-          valueA = a.date;
-          valueB = b.date;
-      }
-      
-      let comparison = 0;
-      if (filters.sortField === 'visit') {
-        // For dates, use numeric comparison
-        comparison = valueA - valueB;
-      } else {
-        // For strings, use locale comparison
-        comparison = String(valueA).localeCompare(String(valueB));
+          // Parse YYYY-MM-DD format explicitly
+          const [yearA2, monthA2, dayA2] = a.latestAppointmentDate.split('-').map(Number);
+          const [yearB2, monthB2, dayB2] = b.latestAppointmentDate.split('-').map(Number);
+          valueA = new Date(yearA2, monthA2 - 1, dayA2).getTime();
+          valueB = new Date(yearB2, monthB2 - 1, dayB2).getTime();
+          comparison = valueA - valueB;
       }
       
       return filters.sortOrder === 'ascend' ? comparison : -comparison;
     });
   } else {
     // Default sorting by visit date (newest first)
-    filteredPatients.sort((a: Patient, b: Patient) => (a.date < b.date ? 1 : -1));
+    filteredPatients.sort((a: Patient, b: Patient) => (a.latestAppointmentDate < b.latestAppointmentDate ? 1 : -1));
   }
   
   // Apply pagination
@@ -201,19 +202,23 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
   };
 };
 
-export const scanUsb = (): Promise<Patient[]> => window.electronAPI.scanUsb();
-export const makePatient = (base: string, date: string) => window.electronAPI.makePatient(base, date);
-export const openPatientFolderInFs = (folder: string) => window.electronAPI.openPatientFolderInFs(folder);
+// USB and project operations
+export const scanUsb = (): Promise<Patient[]> => window.ipcRenderer.invoke("scanUsb");
+export const makePatient = (base: string, date: string) => window.ipcRenderer.invoke("patient:new", base, date);
+export const openPatientFolderInFs = (folder: string) => window.ipcRenderer.invoke("patient:openFolder", folder);
+
+// Patient data operations
+export const getPatientAppointment = (appointmentPath: string) => window.ipcRenderer.invoke("patient:getAppointment", appointmentPath);
 
 export const getPatientMeta = async (folder: string): Promise<PatientMeta> => {
   // Get patient-level data from patient.config
-  const meta = await window.electronAPI.getPatient(folder);
+  const meta = await window.ipcRenderer.invoke("patient:getMeta", folder);
   
   // Get appointments (date folders inside patient folder)
-  const appointments = await window.electronAPI.getPatientAppointments(folder);
+  const appointments = await window.ipcRenderer.invoke("patient:appointments", folder);
 
   // Sort appointments by date (newest first)
-  const sortedAppointments = appointments.sort((a, b) =>
+  const sortedAppointments = appointments.sort((a: Appointment, b: Appointment) =>
     new Date(b.date).getTime() - new Date(a.date).getTime()
   );
   
@@ -225,12 +230,37 @@ export const getPatientMeta = async (folder: string): Promise<PatientMeta> => {
 
 // Save data to patient.config (patient-level)
 export const setPatient = (folder: string, data: { doctor?: string; diagnosis?: string }) =>
-  window.electronAPI.setPatient(folder, data);
+  window.ipcRenderer.invoke("patient:setMeta", folder, data);
 
 // Save data to appointment.config (appointment-level)
-export const setPatientAppointments = (appointmentPath: string, data: { doctor?: string; diagnosis?: string; notes?: string }) =>
-  window.electronAPI.setPatientAppointments(appointmentPath, data);
+export const setPatientAppointments = (appointmentPath: string, data: { doctors?: string[]; diagnosis?: string; notes?: string }) =>
+  window.ipcRenderer.invoke("patient:setAppointment", appointmentPath, data);
 
+// Audio-related functions
+export const getAudioFiles = (baseFolder: string, currentAppointment?: string) => 
+  window.ipcRenderer.invoke("patient:audioFiles", baseFolder, currentAppointment);
+export const loadMoreAudio = (baseFolder: string, currentAppointment?: string) => 
+  window.ipcRenderer.invoke("patient:loadMoreAudio", baseFolder, currentAppointment);
+export const openAudioFolder = (baseFolder: string, currentAppointment?: string) => 
+  window.ipcRenderer.invoke("patient:openAudioFolder", baseFolder, currentAppointment);
+export const saveRecordedAudio = (baseFolder: string, currentAppointment: string | undefined, arrayBuffer: ArrayBuffer, filename: string) => 
+  window.ipcRenderer.invoke("patient:saveRecordedAudio", baseFolder, currentAppointment, arrayBuffer, filename);
+
+// Video-related functions
+export const getClipsDetailed = (baseFolder: string, offset: number, limit: number) => 
+  window.ipcRenderer.invoke("patient:clipsDetailed", baseFolder, offset, limit);
+export const loadMoreVideos = (baseFolder: string) => 
+  window.ipcRenderer.invoke("patient:loadMoreVideos", baseFolder);
+
+// Custom tab functions
+export const getCustomTabFiles = (baseFolder: string, tabName: string, currentAppointment?: string) => 
+  window.ipcRenderer.invoke("getCustomTabFiles", baseFolder, tabName, currentAppointment);
+export const selectAndCopyFiles = (baseFolder: string, tabName: string, currentAppointment?: string) => 
+  window.ipcRenderer.invoke("selectAndCopyFiles", baseFolder, tabName, currentAppointment);
+export const openFileInDefaultApp = (filePath: string) => 
+  window.ipcRenderer.invoke("openFileInDefaultApp", filePath);
+
+// Utility function
 export const parsePatientFolder = (folder: string) => {
   const [surname = "", name = "", dob = ""] = folder.split("_");
   return { surname, name, dob };
