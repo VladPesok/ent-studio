@@ -99,36 +99,6 @@
   background: transparent;
 }
 
-.add-appointment-modal .ant-btn {
-  border-radius: 6px;
-  font-weight: 500;
-  height: 36px;
-  padding: 0 20px;
-}
-
-.add-appointment-modal .ant-btn-primary {
-  background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
-  border: none;
-  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.2);
-}
-
-.add-appointment-modal .ant-btn-primary:hover {
-  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.3);
-}
-
-.add-appointment-modal .ant-btn-default {
-  border: 1px solid #d9d9d9;
-  color: #595959;
-  background: transparent;
-}
-
-.add-appointment-modal .ant-btn-default:hover {
-  border-color: #40a9ff;
-  color: #40a9ff;
-  background: transparent;
-}
 
 /* Select Dropdown Styling */
 .ant-select-dropdown {

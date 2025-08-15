@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import { Modal, Form, Input, DatePicker, Row, Col, Divider, Typography } from "antd";
 import { UserOutlined, CalendarOutlined, MedicineBoxOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/uk";
-import { getDictionaries, addDictionaryEntry } from "../../../helpers/configApi";
+import { AppConfigContext } from "../../../holders/AppConfig";
 import CreatableSelect from "../../../common/input/CreatableSelect";
 import "./AddCardModal.css";
 
@@ -27,33 +27,14 @@ type FormValues = {
 
 const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
   const [form] = Form.useForm<FormValues>();
-  const [dictionaries, setDictionaries] = useState<{ doctors: string[]; diagnosis: string[] }>({
-    doctors: [],
-    diagnosis: []
-  });
+  const { doctors, diagnoses, addDoctor, addDiagnosis } = useContext(AppConfigContext);
   const [loading, setLoading] = useState(false);
 
   const fmt = (d: Dayjs) => d.format("YYYY-MM-DD");
 
-  useEffect(() => {
-    const loadDictionaries = async () => {
-      try {
-        const dicts = await getDictionaries();
-        setDictionaries(dicts);
-      } catch (error) {
-        console.error("Failed to load dictionaries:", error);
-      }
-    };
-    loadDictionaries();
-  }, []);
-
   const handleCreateDoctor = async (value: string) => {
     try {
-      await addDictionaryEntry("doctors", value);
-      setDictionaries(prev => ({
-        ...prev,
-        doctors: [...prev.doctors, value]
-      }));
+      await addDoctor(value);
     } catch (error) {
       console.error("Failed to add doctor:", error);
     }
@@ -61,11 +42,7 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
 
   const handleCreateDiagnosis = async (value: string) => {
     try {
-      await addDictionaryEntry("diagnosis", value);
-      setDictionaries(prev => ({
-        ...prev,
-        diagnosis: [...prev.diagnosis, value]
-      }));
+      await addDiagnosis(value);
     } catch (error) {
       console.error("Failed to add diagnosis:", error);
     }
@@ -221,7 +198,7 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
                  >
                    <CreatableSelect
                      value={form.getFieldValue('doctor') || null}
-                     items={dictionaries.doctors}
+                     items={doctors}
                      onChange={(value) => form.setFieldValue('doctor', value)}
                      onCreate={handleCreateDoctor}
                      placeholder="Оберіть або введіть лікаря"
@@ -237,7 +214,7 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
                  >
                    <CreatableSelect
                      value={form.getFieldValue('diagnosis') || null}
-                     items={dictionaries.diagnosis}
+                     items={diagnoses}
                      onChange={(value) => form.setFieldValue('diagnosis', value)}
                      onCreate={handleCreateDiagnosis}
                      placeholder="Оберіть або введіть діагноз"

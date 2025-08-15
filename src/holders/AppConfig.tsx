@@ -16,6 +16,9 @@ export interface AppConfig {
 
   doctors: string[];
   addDoctor(u: string): void;
+
+  diagnoses: string[];
+  addDiagnosis(d: string): void;
 }
 
 export const AppConfigContext = createContext<AppConfig>(null!);
@@ -27,6 +30,7 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
   const [theme, setTheme]                 = useState<ThemeMode>("light");
   const [locale, setLocale]               = useState<LocaleCode>("en");
   const [doctors, setDoctors]             = useState<string[]>([]);
+  const [diagnoses, setDiagnoses]         = useState<string[]>([]);
   const [currentDoctor, setCurrentDoctor] = useState<string | null>(null);
 
   const [loaded, setLoaded]               = useState(false);      // ← flag
@@ -43,6 +47,7 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
       setTheme(settings.theme);
       setLocale(settings.locale);
       setDoctors(dictionaries.doctors);
+      setDiagnoses(dictionaries.diagnosis);
       setCurrentDoctor(session.currentDoctor);
       setLoaded(true);                       // now safe to persist
     })();
@@ -67,6 +72,13 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
     setDoctors((prev) => [...prev, trimmed]);
   };
 
+  const addDiagnosis = async (name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed || diagnoses.includes(trimmed)) return;
+    await configApi.addDictionaryEntry("diagnosis", trimmed);
+    setDiagnoses((prev) => [...prev, trimmed]);
+  };
+
   /* ------------ context value ---- */
   const value = useMemo<AppConfig>(
     () => ({
@@ -78,8 +90,10 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
       setCurrentDoctor,
       doctors,
       addDoctor,
+      diagnoses,
+      addDiagnosis,
     }),
-    [theme, locale, currentDoctor, doctors],
+    [theme, locale, currentDoctor, doctors, diagnoses],
   );
 
   return (

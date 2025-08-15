@@ -1,4 +1,3 @@
-// All patient-related IPC calls live here
 export interface Patient {
   name: string;
   birthdate: string;
@@ -8,15 +7,26 @@ export interface Patient {
   folder: string; // Keep for backward compatibility
 }
 
-export interface Appointment {
-  date: string;
-  folder: string;
+export interface AppointmentConfig {
+  doctors: string[];
+  diagnosis: string;
+  notes: string;
 }
 
-export interface PatientMeta {
-  doctor?: string;
-  diagnosis?: string;
-  appointments?: Appointment[];
+export interface Appointment extends AppointmentConfig {
+  date: string;
+}
+
+export interface PatientConfig {
+  doctor: string;
+  diagnosis: string;
+}
+
+export interface Patient extends PatientConfig {
+  name: string;
+  birthdate: string;
+  latestAppointmentDate: string;
+  appointments: Appointment[];
 }
 
 export interface PatientFilters {
@@ -204,13 +214,13 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
 
 // USB and project operations
 export const scanUsb = (): Promise<Patient[]> => window.ipcRenderer.invoke("scanUsb");
-export const makePatient = (base: string, date: string) => window.ipcRenderer.invoke("patient:new", base, date);
+export const makePatient = (base: string, date: string, metadata?: { name: string; birthdate: string; doctor: string; diagnosis: string }) => window.ipcRenderer.invoke("patient:new", base, date, metadata);
 export const openPatientFolderInFs = (folder: string) => window.ipcRenderer.invoke("patient:openFolder", folder);
 
 // Patient data operations
 export const getPatientAppointment = (appointmentPath: string) => window.ipcRenderer.invoke("patient:getAppointment", appointmentPath);
 
-export const getPatientMeta = async (folder: string): Promise<PatientMeta> => {
+export const getPatientMeta = async (folder: string): Promise<Patient> => {
   // Get patient-level data from patient.config
   const meta = await window.ipcRenderer.invoke("patient:getMeta", folder);
   
@@ -239,8 +249,10 @@ export const setPatientAppointments = (appointmentPath: string, data: { doctors?
 // Audio-related functions
 export const getAudioFiles = (baseFolder: string, currentAppointment?: string) => 
   window.ipcRenderer.invoke("patient:audioFiles", baseFolder, currentAppointment);
+
 export const loadMoreAudio = (baseFolder: string, currentAppointment?: string) => 
   window.ipcRenderer.invoke("patient:loadMoreAudio", baseFolder, currentAppointment);
+
 export const openAudioFolder = (baseFolder: string, currentAppointment?: string) => 
   window.ipcRenderer.invoke("patient:openAudioFolder", baseFolder, currentAppointment);
 export const saveRecordedAudio = (baseFolder: string, currentAppointment: string | undefined, arrayBuffer: ArrayBuffer, filename: string) => 

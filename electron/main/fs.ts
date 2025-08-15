@@ -222,7 +222,6 @@ export const setFsOperations = (): void => {
     return path.join(patientsRoot, folder, "patient.config");
   };
 
-  // Patient-level config (main doctor/diagnosis)
   ipcMain.handle("patient:getMeta", async (_e, folder: string) =>
     ensureJson(patientCfg(folder), { doctor: "", diagnosis: "" }),
   );
@@ -248,8 +247,7 @@ export const setFsOperations = (): void => {
           
           appointments.push({
             date: entry.name,
-            doctors: config.doctors || [],
-            diagnosis: config.diagnosis || ""
+            ...config
           });
         }
       }
@@ -290,7 +288,7 @@ export const setFsOperations = (): void => {
     return { video: (await listDirClips(videoDir)).map(toUrl) };
   });
 
-  ipcMain.handle("patient:new", async (_e, base: string, date: string) => {
+  ipcMain.handle("patient:new", async (_e, base: string, date: string, metadata?: { name: string; birthdate: string; doctor: string; diagnosis: string }) => {
     const pRoot = path.join(patientsRoot, base);
     const appt  = path.join(pRoot, date, "video");
     await ensureDir(appt);
@@ -298,11 +296,22 @@ export const setFsOperations = (): void => {
     // Create patient.config in patient folder
     const patientConfigFile = path.join(pRoot, "patient.config");
     if (!(await exists(patientConfigFile))) {
-      await fs.writeFile(patientConfigFile, JSON.stringify({ doctor: "", diagnosis: "" }, null, 2), "utf8");
+      const patientConfig = metadata ? 
+        { doctor: metadata.doctor, diagnosis: metadata.diagnosis } : 
+        { doctor: "", diagnosis: "" };
+      await fs.writeFile(patientConfigFile, JSON.stringify(patientConfig, null, 2), "utf8");
     }
     
-    // Create appointment.config in appointment folder
-    await fs.writeFile(path.join(pRoot, date, "appointment.config"), "{}", "utf8");
+    // Create appointment.config in appointment folder with patient data
+    let appointmentConfig = {};
+    if (metadata) {
+      appointmentConfig = {
+        doctors: [metadata.doctor],
+        diagnosis: metadata.diagnosis,
+        notes: ""
+      };
+    }
+    await fs.writeFile(path.join(pRoot, date, "appointment.config"), JSON.stringify(appointmentConfig, null, 2), "utf8");
   });
 
   ipcMain.handle("patient:openFolder", async (_e, folder: string) => {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useContext } from "react";
 import { Table, Input, Button, Dropdown, theme as antTheme, MenuProps, DatePicker, Select, Space, Tag, Row, Col, Pagination } from "antd";
 import {
   EllipsisOutlined,
@@ -13,7 +13,7 @@ import AddCardModal from "./AddCardModal/AddCardModal";
 import type { ColumnsType } from "antd/es/table";
 import type { FilterDropdownProps } from "antd/es/table/interface";
 import * as patientsApi from "../../helpers/patientsApi";
-import * as configApi from "../../helpers/configApi";
+import { AppConfigContext } from "../../holders/AppConfig";
 import "./PatientsList.css";
 
 const { RangePicker } = DatePicker;
@@ -23,11 +23,10 @@ const { useToken } = antTheme;
 
 
 const PatientsList: React.FC = () => {
+  const { doctors, diagnoses } = useContext(AppConfigContext);
   const [patients, setPatients] = useState<patientsApi.Patient[]>([]);
 
   const [addOpen, setAddOpen] = useState(false);
-
-  const [dicts, setDicts] = useState<{ doctors: string[]; diagnosis: string[] }>({ doctors: [], diagnosis: [] });
   const [tableState, setTableState] = useState<patientsApi.TableState>({
     pagination: { current: 1, pageSize: 10, total: 0 },
     filters: {},
@@ -211,18 +210,8 @@ const PatientsList: React.FC = () => {
     }));
   };
 
-  const loadDictionaries = async () => {
-    try {
-      const dictionaries = await configApi.getDictionaries();
-      setDicts(dictionaries);
-    } catch (error) {
-      console.error('Failed to load dictionaries:', error);
-    }
-  };
-
   useEffect(() => {
     reloadPatients();
-    loadDictionaries();
   }, []);
 
   const handleSearchChange = async (value: string) => {
@@ -333,7 +322,7 @@ const PatientsList: React.FC = () => {
       key: "doctor",
       width: 240,
       sorter: true,
-      ...getSelectProps(dicts.doctors, 'doctor'),
+      ...getSelectProps(doctors, 'doctor'),
     },
     {
       title: "Діагноз",
@@ -341,7 +330,7 @@ const PatientsList: React.FC = () => {
       key: "diagnosis",
       width: 240,
       sorter: true,
-      ...getSelectProps(dicts.diagnosis, 'diagnosis'),
+      ...getSelectProps(diagnoses, 'diagnosis'),
     },
     {
       title: "",
@@ -372,9 +361,20 @@ const PatientsList: React.FC = () => {
   ];
 
   const handleAdd = async (folderBase: string, date: string, metadata: { doctor: string; diagnosis: string }) => {
-    await patientsApi.makePatient(folderBase, date);
+    // Extract name and birthdate from folderBase (format: surname_name_YYYY-MM-DD)
+    const parts = folderBase.split('_');
+    const surname = parts[0] || '';
+    const name = parts[1] || '';
+    const birthdate = parts[2] || '';
     
-    await patientsApi.setPatient(folderBase, metadata);
+    const fullMetadata = {
+      name: `${surname} ${name}`.trim(),
+      birthdate,
+      doctor: metadata.doctor,
+      diagnosis: metadata.diagnosis
+    };
+    
+    await patientsApi.makePatient(folderBase, date, fullMetadata);
     
     setAddOpen(false);
     reloadPatients();
