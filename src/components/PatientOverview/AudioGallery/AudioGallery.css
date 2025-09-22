@@ -102,6 +102,13 @@
   margin-bottom: 12px;
 }
 
+.file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .play-pause-btn {
   background: none;
   border: none;
@@ -184,7 +191,12 @@
 }
 
 .file-ext::before {
-  content: "🎵";
+  content: "📄";
+  margin-right: 4px;
+}
+
+.file-type::before {
+  content: "🏷️";
   margin-right: 4px;
 }
 

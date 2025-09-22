@@ -58,6 +58,7 @@ const PatientOverview: React.FC = () => {
     latestAppointmentDate: "",
     doctor: "",
     diagnosis: "",
+    patientCard: "",
     folder: "",
     appointments: [],
   });
@@ -91,16 +92,14 @@ const PatientOverview: React.FC = () => {
         setPatientMeta(patientMeta);
         setShownTabs(Array.isArray(tabs) ? tabs : configApi.getDefaultTabs());
         
-        // Set currentAppointment as inner variable (not saved to config)
         const selectedAppointment = patientMeta.appointments?.[0]?.date || "";
         setCurrentAppointment(selectedAppointment);
         
-        // Load patient-level data (only doctor and diagnosis)
         const loaded = {
           doctor:      patientMeta?.doctor     ?? "",
           diagnosis:   patientMeta?.diagnosis  ?? "",
-          notes:       "", // notes are appointment-level, not patient-level
-          voiceReport: [], // voiceReport is appointment-level, not patient-level
+          notes:       "",
+          voiceReport: [],
         };
         setForm(loaded);
         
@@ -137,21 +136,12 @@ const PatientOverview: React.FC = () => {
       if (Object.keys(patientConfigData).length > 0) {
         await patientsApi.setPatient(folder, patientConfigData);
       }
-
-      if (newForm.doctor && !doctors.includes(newForm.doctor))
-        await addDoctor(newForm.doctor);
-
-      if (newForm.diagnosis && !diagnoses.includes(newForm.diagnosis))
-        await addDiagnosis(newForm.diagnosis);
     } catch (error) {
       console.error('Failed to auto-save patient data:', error);
     }
   };
 
-
-
   const handleAppointmentChange = async (appointmentDate: string) => {
-    // Skip reload if clicking on the current appointment
     if (currentAppointment === appointmentDate) {
       return;
     }
@@ -159,7 +149,6 @@ const PatientOverview: React.FC = () => {
     setCurrentAppointment(appointmentDate);
     setCurrentAppointmentLoading(true);
     
-    // Load appointment-specific data from appointment.config
     try {
       const appointmentData = await patientsApi.getPatientAppointment(`${folder}/${appointmentDate}`);
       setCurrentAppointmentForm({
@@ -168,7 +157,6 @@ const PatientOverview: React.FC = () => {
         notes: appointmentData.notes || "",
       });
     } catch (error) {
-      // If appointment data doesn't exist, use defaults
       setCurrentAppointmentForm({
         doctors: [],
         diagnosis: "",
@@ -228,6 +216,27 @@ const PatientOverview: React.FC = () => {
       await patientsApi.openPatientFolderInFs(folder);
     } catch (error) {
       console.error('Failed to open patient folder:', error);
+    }
+  };
+
+  const handleOpenPatientCard = async () => {
+    if (!patientMeta.patientCard) {
+      message.error('Картка пацієнта не знайдена');
+      return;
+    }
+
+    try {
+      const result = await configApi.openPatientCard(folder, patientMeta.patientCard);
+      if (!result.success) {
+        if (result.fallbackUsed) {
+          message.warning('Не вдалося відкрити файл, відкрито папку пацієнта');
+        } else {
+          message.error(result.error || 'Не вдалося відкрити картку пацієнта');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to open patient card:', error);
+      message.error('Не вдалося відкрити картку пацієнта');
     }
   };
 
@@ -364,9 +373,18 @@ const PatientOverview: React.FC = () => {
             title={
               <>
                 <div style={{ marginTop: 8 }}>
-                  <Title level={3} style={{ margin: 0 }}>
-                    {surname} {name}
-                  </Title>
+                  <Tooltip title={patientMeta.patientCard ? "Відкрити картку пацієнта" : ""}>
+                    <Title 
+                      level={3} 
+                      style={{ 
+                        margin: 0, 
+                        cursor: patientMeta.patientCard ? 'pointer' : 'default' 
+                      }}
+                      onClick={patientMeta.patientCard ? handleOpenPatientCard : undefined}
+                    >
+                      {surname} {name}
+                    </Title>
+                  </Tooltip>
                 </div>
                 
                 <Descriptions column={1} size="small" style={{ marginBottom: 8 }}>

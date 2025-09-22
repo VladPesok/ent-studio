@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
-import { Modal, Form, Input, DatePicker, Row, Col, Divider, Typography } from "antd";
-import { UserOutlined, CalendarOutlined, MedicineBoxOutlined } from "@ant-design/icons";
+import { Modal, Form, Input, DatePicker, Row, Col, Divider, Typography, Select } from "antd";
+import { UserOutlined, CalendarOutlined, MedicineBoxOutlined, FileTextOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/uk";
 import { AppConfigContext } from "../../../holders/AppConfig";
@@ -12,7 +12,7 @@ dayjs.locale("uk");
 const { Title, Text } = Typography;
 
 interface Props {
-  onOk(folderBase: string, visitDate: string, metadata: { doctor: string; diagnosis: string }): Promise<void>;
+  onOk(folderBase: string, visitDate: string, metadata: { doctor: string; diagnosis: string; patientCard?: string }): Promise<void>;
   onClose(): void;
 }
 
@@ -23,14 +23,33 @@ type FormValues = {
   visitDate: Dayjs;
   doctor?: string;
   diagnosis?: string;
+  patientCard?: string;
 };
 
 const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
   const [form] = Form.useForm<FormValues>();
-  const { doctors, diagnoses, addDoctor, addDiagnosis } = useContext(AppConfigContext);
+  const { 
+    doctors, 
+    diagnoses, 
+    addDoctor, 
+    addDiagnosis,
+    patientCards,
+    defaultPatientCard,
+    getEffectiveDefaultCard
+  } = useContext(AppConfigContext);
   const [loading, setLoading] = useState(false);
 
   const fmt = (d: Dayjs) => d.format("YYYY-MM-DD");
+
+  // Set default patient card selection when component mounts
+  useEffect(() => {
+    if (patientCards.length > 0) {
+      const effectiveDefault = getEffectiveDefaultCard();
+      if (effectiveDefault) {
+        form.setFieldValue('patientCard', effectiveDefault);
+      }
+    }
+  }, [patientCards, defaultPatientCard, form, getEffectiveDefaultCard]);
 
   const handleCreateDoctor = async (value: string) => {
     try {
@@ -57,7 +76,8 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
       // Pass metadata to parent component for proper sequencing
       await onOk(folderBase, fmt(v.visitDate), {
         doctor: v.doctor || "",
-        diagnosis: v.diagnosis || ""
+        diagnosis: v.diagnosis || "",
+        patientCard: v.patientCard
       });
     } catch {
       // Form validation failed
@@ -128,58 +148,55 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
               </Col>
             </Row>
 
-            <Form.Item
-              label="Дата народження"
-              name="dob"
-              rules={[
-                { required: true, message: "Вкажіть дату народження" },
-                {
-                  validator: (_, value) =>
-                    value && value.isValid()
-                      ? Promise.resolve()
-                      : Promise.reject("Невірний формат дати"),
-                },
-              ]}
-            >
-              <DatePicker
-                allowClear={false}
-                format="DD-MM-YYYY"
-                style={{ width: "100%" }}
-                size="large"
-                prefix={<CalendarOutlined />}
-                placeholder="Оберіть дату народження"
-              />
-            </Form.Item>
-          </div>
-
-          <Divider />
-
-          <div className="form-section">
-            <Title level={5} className="section-title">
-              <CalendarOutlined /> Дата прийому
-            </Title>
-            
-            <Form.Item
-              label="Дата прийому"
-              name="visitDate"
-              rules={[
-                { required: true, message: "Вкажіть дату прийому" },
-                {
-                  validator: (_, value) =>
-                    value && value.isValid()
-                      ? Promise.resolve()
-                      : Promise.reject("Невірний формат дати"),
-                },
-              ]}
-            >
-              <DatePicker
-                allowClear={false}
-                format="DD-MM-YYYY"
-                style={{ width: "100%" }}
-                size="large"
-                placeholder="Оберіть дату прийому"
-              />
-            </Form.Item>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="Дата народження"
+                  name="dob"
+                  rules={[
+                    { required: true, message: "Вкажіть дату народження" },
+                    {
+                      validator: (_, value) =>
+                        value && value.isValid()
+                          ? Promise.resolve()
+                          : Promise.reject("Невірний формат дати"),
+                    },
+                  ]}
+                >
+                  <DatePicker
+                    allowClear={false}
+                    format="DD-MM-YYYY"
+                    style={{ width: "100%" }}
+                    size="large"
+                    placeholder="Оберіть дату народження"
+                  />
+                </Form.Item>
+              </Col>
+              
+              <Col span={12}>
+                <Form.Item
+                  label="Дата прийому"
+                  name="visitDate"
+                  rules={[
+                    { required: true, message: "Вкажіть дату прийому" },
+                    {
+                      validator: (_, value) =>
+                        value && value.isValid()
+                          ? Promise.resolve()
+                          : Promise.reject("Невірний формат дати"),
+                    },
+                  ]}
+                >
+                  <DatePicker
+                    allowClear={false}
+                    format="DD-MM-YYYY"
+                    style={{ width: "100%" }}
+                    size="large"
+                    placeholder="Оберіть дату прийому"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
           </div>
 
           <Divider />
@@ -187,7 +204,6 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
           <div className="form-section optional-section">
             <Title level={5} className="section-title">
               <MedicineBoxOutlined /> Медична інформація 
-              <Text type="secondary" className="optional-label">(необов'язково)</Text>
             </Title>
             
             <Row gutter={16}>
@@ -219,6 +235,29 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
                      onCreate={handleCreateDiagnosis}
                      placeholder="Оберіть або введіть діагноз"
                      style={{ width: '100%' }}
+                   />
+                 </Form.Item>
+               </Col>
+              </Row>
+              <Row gutter={16}>
+               <Col span={24}>
+                 <Form.Item
+                   label="Картка пацієнта"
+                   name="patientCard"
+                   rules={[
+                     { required: true, message: "Оберіть картку пацієнта" }
+                   ]}
+                 >
+                   <Select
+                     placeholder="Оберіть картку пацієнта"
+                     style={{ width: '100%' }}
+                     disabled={patientCards.length === 0}
+                     notFoundContent={patientCards.length === 0 ? "Немає доступних карток" : "Не знайдено"}
+                     suffixIcon={<FileTextOutlined />}
+                     options={patientCards.map(card => ({
+                       label: card.name,
+                       value: card.name + card.extension
+                     }))}
                    />
                  </Form.Item>
                </Col>

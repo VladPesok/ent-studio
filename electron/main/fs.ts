@@ -7,15 +7,24 @@ import type { App, Dialog, IpcMain } from "electron";
 import { shell } from "electron";
 import { spawn, execFile  } from "child_process";
 
-export const makePatientsRoot = (app: App) =>
-  path.join(app.getPath("userData"), "patients");
+import {getFileType} from '../../src/helpers/fileTypeHelper';
 
-export const isClip = (f: string) =>
+const DEFAULT_CFG = {
+  dictionaries: { doctors: [] as string[], diagnosis: [] as string[] },
+  settings    : { theme: "light" as "light" | "dark", locale: "en" as "en" | "ua", praatPath: "" as string, defaultPatientCard: null as string | null },
+  session     : { currentDoctor: null as string | null },
+  shownTabs   : [
+    { name: "video_materials", folder: "video" },
+    { name: "voice_report", folder: "audio" }
+  ] as { name: string; folder: string }[],
+};
+
+const isClip = (f: string) =>
   [".mp4", ".avi"].includes(extname(f).toLowerCase());
 
-export const ensureDir = (dir: string) => fs.mkdir(dir, { recursive: true });
+const ensureDir = (dir: string) => fs.mkdir(dir, { recursive: true });
 
-export const exists = async (p: string) =>
+const exists = async (p: string) =>
   fs.access(p).then(() => true).catch(() => false);
 
 
@@ -37,17 +46,14 @@ const copySession = async (
   const videoDir        = path.join(appointmentRoot, "video");
   const voiceDir        = path.join(appointmentRoot, "voice");
 
-  /* create patient / appointment dirs on first encounter */
   await ensureDir(videoDir);
   await ensureDir(voiceDir);
 
-  /* create patient.config in patient folder if it doesn't exist */
   const patientConfigFile = path.join(patientRoot, "patient.config");
   if (!(await exists(patientConfigFile))) {
     await fs.writeFile(patientConfigFile, JSON.stringify({ doctor: "", diagnosis: "" }, null, 2), "utf8");
   }
 
-  /* cfg stub per appointment */
   const cfgFile = path.join(appointmentRoot, "appointment.config");
   if (!(await exists(cfgFile))) await fs.writeFile(cfgFile, "{}", "utf8");
 
@@ -77,7 +83,7 @@ const buildProjects = async (patientsRoot: string) => {
       .filter((d) => d.isDirectory())
       .map(async (d) => {
         const patientConfigFile = path.join(patientsRoot, d.name, "patient.config");
-        let patientConfig = { doctor: "", diagnosis: "" };
+        let patientConfig = { doctor: "", diagnosis: "", patientCard: "" };
         
         try {
           const configContent = await fs.readFile(patientConfigFile, "utf8");
@@ -95,6 +101,7 @@ const buildProjects = async (patientsRoot: string) => {
           latestAppointmentDate,
           doctor: patientConfig.doctor || "",
           diagnosis: patientConfig.diagnosis || "",
+          patientCard: patientConfig.patientCard || "",
           folder: d.name // Keep folder for backward compatibility
         };
       }),
@@ -117,11 +124,18 @@ const latestAppointmentDir = async (patientsRoot: string, folder: string) => {
   return path.join(patientsRoot, folder, dates);
 };
 
-export const setFsOperations = (): void => {
-  const patientsRoot = makePatientsRoot(app);
+export const setFsOperations = async (): Promise<void> => {
+  const appDataFolder = path.join(app.getPath("userData"), "appData");
+
+  const patientsRoot = path.join(appDataFolder, "patients");
+  await ensureDir(patientsRoot);
+
+  const settingsRoot = path.join(appDataFolder, "settings");
+  await ensureDir(settingsRoot);
+
+  const appCfg = path.join(settingsRoot, "app.config");
 
   ipcMain.handle("getProjects", async () => {
-    await ensureDir(patientsRoot);
     return buildProjects(patientsRoot);
   });
 
@@ -131,7 +145,6 @@ export const setFsOperations = (): void => {
     });
     if (canceled || !filePaths.length) return [];
 
-    await ensureDir(patientsRoot);
     const usb = filePaths[0];
 
     const entries = await fs.readdir(usb, { withFileTypes: true });
@@ -141,10 +154,6 @@ export const setFsOperations = (): void => {
 
     return buildProjects(patientsRoot);
   });
-
-
-
-  const appCfg = () => path.join(patientsRoot, "app.config");
 
   const ensureJson = async (file: string, init: any) => {
     try { await fs.access(file); }
@@ -162,60 +171,50 @@ export const setFsOperations = (): void => {
   const saveJson = (file: string, data: any) =>
     fs.writeFile(file, JSON.stringify(data, null, 2), "utf8");
 
-  const DEFAULT_CFG = {
-    dictionaries: { doctors: [] as string[], diagnosis: [] as string[] },
-    settings    : { theme: "light" as "light" | "dark", locale: "en" as "en" | "ua", praatPath: "" as string },
-    session     : { currentDoctor: null as string | null },
-    shownTabs   : [
-      { name: "video_materials", folder: "video" },
-      { name: "voice_report", folder: "audio" }
-    ] as { name: string; folder: string }[],
-  };
-
   ipcMain.handle("dict:get", async () => {
-    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
     return cfg.dictionaries;
   });
 
   ipcMain.handle(
     "dict:add",
     async (_e, type: "doctors" | "diagnosis", value: string) => {
-      const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+      const cfg = await ensureJson(appCfg, DEFAULT_CFG);
       if (!cfg.dictionaries[type].includes(value)) {
         cfg.dictionaries[type].push(value);
-        await saveJson(appCfg(), cfg);
+        await saveJson(appCfg, cfg);
       }
     },
   );
 
   ipcMain.handle("settings:get", async () => {
-    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
     return cfg.settings;
   });
   ipcMain.handle("settings:set", async (_e, patch) => {
-    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
     cfg.settings = { ...cfg.settings, ...patch };
-    await saveJson(appCfg(), cfg);
+    await saveJson(appCfg, cfg);
   });
 
   ipcMain.handle("session:get", async () => {
-    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
     return cfg.session;
   });
   ipcMain.handle("session:set", async (_e, patch) => {
-    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
     cfg.session = { ...cfg.session, ...patch };
-    await saveJson(appCfg(), cfg);
+    await saveJson(appCfg, cfg);
   });
 
   ipcMain.handle("shownTabs:get", async () => {
-    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
     return cfg.shownTabs;
   });
   ipcMain.handle("shownTabs:set", async (_e, tabs) => {
-    const cfg = await ensureJson(appCfg(), DEFAULT_CFG);
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
     cfg.shownTabs = tabs;
-    await saveJson(appCfg(), cfg);
+    await saveJson(appCfg, cfg);
   });
 
   const patientCfg = (folder: string) => {
@@ -223,7 +222,7 @@ export const setFsOperations = (): void => {
   };
 
   ipcMain.handle("patient:getMeta", async (_e, folder: string) =>
-    ensureJson(patientCfg(folder), { doctor: "", diagnosis: "" }),
+    ensureJson(patientCfg(folder), { doctor: "", diagnosis: "", patientCard: "" }),
   );
   ipcMain.handle("patient:setMeta", async (_e, folder: string, data: any) => {
     const file = patientCfg(folder);
@@ -252,20 +251,17 @@ export const setFsOperations = (): void => {
         }
       }
       
-      // Sort appointments by date (newest first)
       return appointments.sort((a, b) => b.date.localeCompare(a.date));
     } catch {
       return [];
     }
   });
 
-  // Get appointment-specific data from appointment.config
   ipcMain.handle("patient:getAppointment", async (_e, appointmentPath: string) => {
     const configFile = path.join(patientsRoot, appointmentPath, "appointment.config");
     return ensureJson(configFile, { doctors: [] as string[], diagnosis: "", notes: "" });
   });
 
-  // Save appointment-specific data to appointment.config
   ipcMain.handle("patient:setAppointment", async (_e, appointmentPath: string, data: any) => {
     const configFile = path.join(patientsRoot, appointmentPath, "appointment.config");
     const cur = await ensureJson(configFile, { doctors: [] as string[], diagnosis: "", notes: "" });
@@ -288,7 +284,7 @@ export const setFsOperations = (): void => {
     return { video: (await listDirClips(videoDir)).map(toUrl) };
   });
 
-  ipcMain.handle("patient:new", async (_e, base: string, date: string, metadata?: { name: string; birthdate: string; doctor: string; diagnosis: string }) => {
+  ipcMain.handle("patient:new", async (_e, base: string, date: string, metadata?: { name: string; birthdate: string; doctor: string; diagnosis: string; patientCard?: string }) => {
     const pRoot = path.join(patientsRoot, base);
     const appt  = path.join(pRoot, date, "video");
     await ensureDir(appt);
@@ -297,8 +293,8 @@ export const setFsOperations = (): void => {
     const patientConfigFile = path.join(pRoot, "patient.config");
     if (!(await exists(patientConfigFile))) {
       const patientConfig = metadata ? 
-        { doctor: metadata.doctor, diagnosis: metadata.diagnosis } : 
-        { doctor: "", diagnosis: "" };
+        { doctor: metadata.doctor, diagnosis: metadata.diagnosis, patientCard: metadata.patientCard || "" } : 
+        { doctor: "", diagnosis: "", patientCard: "" };
       await fs.writeFile(patientConfigFile, JSON.stringify(patientConfig, null, 2), "utf8");
     }
     
@@ -503,7 +499,7 @@ export const setFsOperations = (): void => {
     }
   });
 
-  // Audio file operations
+  // Audio file operations (now supports all file types)
   ipcMain.handle("patient:audioFiles", async (_e, folder: string, currentAppointment?: string) => {
     let audioDir: string;
     
@@ -518,19 +514,14 @@ export const setFsOperations = (): void => {
       await ensureDir(audioDir);
       const entries = await fs.readdir(audioDir, { withFileTypes: true });
       
-      const audioExtensions = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.wma', '.webm', '.mp4'];
-      
       const files = await Promise.all(
         entries
           .filter(entry => entry.isFile())
-          .filter(entry => {
-            const ext = extname(entry.name).toLowerCase();
-            return audioExtensions.includes(ext);
-          })
           .map(async (entry) => {
             const filePath = path.join(audioDir, entry.name);
             const stats = await fs.stat(filePath);
             const ext = extname(entry.name).toLowerCase();
+            const fileType = getFileType(ext);
             
             return {
               url: `file://${filePath}`,
@@ -539,7 +530,8 @@ export const setFsOperations = (): void => {
               size: stats.size,
               extension: ext,
               modified: stats.mtime,
-              fileType: 'audio'
+              fileType: fileType,
+              isAudio: fileType === 'audio'
             };
           })
       );
@@ -555,7 +547,6 @@ export const setFsOperations = (): void => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile", "multiSelections"],
       filters: [
-        { name: "Audio Files", extensions: ["mp3", "wav", "m4a", "aac", "ogg", "flac", "wma", "webm", "mp4"] },
         { name: "All Files", extensions: ["*"] }
       ]
     });
@@ -661,77 +652,237 @@ export const setFsOperations = (): void => {
     }
   }
 
-  async function closePraatProcesses() {
-    const platform = process.platform;
-    
-    try {
-      if (platform === "win32") {
-        // Windows: kill all Praat processes
-        spawn("taskkill", ["/F", "/IM", "Praat.exe"], { stdio: "ignore" });
-      } else if (platform === "darwin") {
-        // macOS: kill all Praat processes
-        spawn("pkill", ["-f", "Praat"], { stdio: "ignore" });
-      } else {
-        // Linux/Unix: kill all Praat processes
-        spawn("pkill", ["-f", "praat"], { stdio: "ignore" });
-      }
-      
-      // Wait a moment for processes to close
-      await new Promise(resolve => setTimeout(resolve, 500));
-    } catch (error) {
-      console.log('Note: Could not close existing Praat processes:', error);
-      // Continue anyway - this is not a critical error
-    }
+  async function pathExists(p: string) {
+    try { await fs.access(p); return true; } catch { return false; }
   }
 
-  async function launchPraat(praatPath: string, audioFilePath: string) {
+  function buildOpenArgs(files: string[]) {
+    // Ensure Praat receives --open before EACH file (more robust than one --open)
+    return files.flatMap(f => ["--open", f]);
+  }
+
+  async function launchPraat(praatPath: string, audioFilePaths: string | string[]) {
     const platform = process.platform;
-    console.log('Platform:', platform);
+    const files = Array.isArray(audioFilePaths) ? audioFilePaths : [audioFilePaths];
 
-    // First, try to close any existing Praat processes
-    await closePraatProcesses();
+    if (files.length === 0) throw new Error("No audio files provided");
 
-    if (platform === "darwin") {
-      // macOS: use --open flag
-      const child = spawn(praatPath, ["--open", audioFilePath], { stdio: "ignore", detached: true });
-      child.unref();
-      return;
+    // Verify all files exist
+    const checks = await Promise.all(files.map(f => pathExists(f)));
+    const missingIdx = checks.findIndex(ok => !ok);
+    if (missingIdx !== -1) {
+      throw new Error(`Audio file not found: ${files[missingIdx]}`);
     }
 
-    if (platform === "win32") {
-      // Windows: use --open flag with spawn
-      const child = spawn(praatPath, ["--open", audioFilePath], {
-        stdio: "ignore",
-        detached: true
-      });
-      child.unref();
-      return;
-    }
+    // Working directory = directory of the first file
+    const cwd = path.dirname(files[0]);
 
-    // Linux/Unix: use --open flag
-    const child = spawn(praatPath, ["--open", audioFilePath], { stdio: "ignore", detached: true });
+    const args = buildOpenArgs(files);
+
+    // Spawn detached so Electron doesn’t wait on Praat
+    const child = spawn(praatPath, args, {
+      cwd,
+      detached: true,
+      stdio: "ignore",
+      windowsVerbatimArguments: true, // safer for paths with spaces on Windows
+    });
+
     child.unref();
   }
 
-  ipcMain.handle("praat:openFile", async (_e, praatPath: string, audioFilePath: string) => {
+  ipcMain.handle(
+    "praat:openFile",
+    async (_e, praatPath: string, audioFilePaths: string | string[]) => {
+      try {
+        if (!praatPath || !audioFilePaths) {
+          return { success: false, error: "Missing praatPath or audioFilePaths" };
+        }
+
+        const praatOk = await isExecutable(praatPath);
+        if (!praatOk) {
+          return { success: false, error: `Praat not found or not executable: ${praatPath}` };
+        }
+
+        await launchPraat(praatPath, audioFilePaths);
+        return { success: true };
+      } catch (error) {
+        console.error("Error opening file(s) with Praat:", error);
+        return { success: false, error: error instanceof Error ? error.message : String(error) };
+      }
+    }
+  );
+
+  // Patient Cards operations
+  const patientCardsRoot = path.join(settingsRoot, "patientCards");
+  await ensureDir(patientCardsRoot);
+
+  ipcMain.handle("patientCards:get", async () => {
     try {
-      // Basic checks + helpful diagnostics
-      if (!praatPath || !audioFilePath) {
-        return { success: false, error: "Missing praatPath or audioFilePath" };
+      const entries = await fs.readdir(patientCardsRoot, { withFileTypes: true });
+      
+      const cards = await Promise.all(
+        entries
+          .filter(entry => entry.isFile())
+          .filter(entry => {
+            // Filter out temporary files (starting with ~$ or .)
+            if (entry.name.startsWith('~$') || entry.name.startsWith('.')) {
+              return false;
+            }
+            
+            const ext = extname(entry.name).toLowerCase();
+            return ['.doc', '.docx', '.rtf'].includes(ext);
+          })
+          .map(async (entry) => {
+            const filePath = path.join(patientCardsRoot, entry.name);
+            const stats = await fs.stat(filePath);
+            const ext = extname(entry.name).toLowerCase();
+            const nameWithoutExt = entry.name.replace(/\.[^/.]+$/, '');
+            
+            return {
+              name: nameWithoutExt,
+              path: filePath,
+              size: stats.size,
+              extension: ext,
+              modified: stats.mtime
+            };
+          })
+      );
+      return cards.sort((a, b) => b.modified.getTime() - a.modified.getTime());
+    } catch (error) {
+      console.error('Error loading patient cards:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle("patientCards:import", async (_e, cardName: string, arrayBuffer: ArrayBuffer, originalFileName: string) => {
+    try {
+      // Validate card name
+      const invalidChars = /[<>:"/\\|?*]/g;
+      if (invalidChars.test(cardName) || !cardName.trim()) {
+        return { success: false, error: "Invalid card name" };
       }
 
-      const [praatExists, audioExists] = await Promise.all([
-        isExecutable(praatPath),
-        fs.access(audioFilePath).then(() => true).catch(() => false),
-      ]);
+      // Get file extension from original file
+      const originalExt = extname(originalFileName).toLowerCase();
+      if (!['.doc', '.docx', '.rtf'].includes(originalExt)) {
+        return { success: false, error: "Unsupported file type" };
+      }
 
-      if (!praatExists) return { success: false, error: `Praat not found or not executable: ${praatPath}` };
-      if (!audioExists) return { success: false, error: `Audio file not found: ${audioFilePath}` };
-
-      await launchPraat(praatPath, audioFilePath);
+      // Create filename with proper extension
+      const fileName = `${cardName.trim()}${originalExt}`;
+      const filePath = path.join(patientCardsRoot, fileName);
+      
+      // Check if file already exists
+      if (await exists(filePath)) {
+        return { success: false, error: "File with this name already exists" };
+      }
+      
+      // Convert ArrayBuffer to Buffer and save
+      const buffer = Buffer.from(arrayBuffer);
+      await fs.writeFile(filePath, buffer);
+      
       return { success: true };
     } catch (error) {
-      console.error("Error opening file with Praat:", error);
+      console.error('Error importing patient card:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // Default Patient Card operations
+  ipcMain.handle("defaultPatientCard:get", async () => {
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
+    return cfg.settings.defaultPatientCard;
+  });
+
+  ipcMain.handle("defaultPatientCard:set", async (_e, fileName: string | null) => {
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
+    cfg.settings.defaultPatientCard = fileName;
+    await saveJson(appCfg, cfg);
+  });
+
+  // Copy patient card to patient folder
+  ipcMain.handle("patientCards:copyToPatient", async (_e, cardFileName: string, patientFolderName: string) => {
+    try {
+      const sourceCardPath = path.join(patientCardsRoot, cardFileName);
+      
+      // Check if source card exists
+      if (!(await exists(sourceCardPath))) {
+        return { success: false, error: "Patient card not found" };
+      }
+      
+      // Create destination path in patient folder
+      const patientFolderPath = path.join(patientsRoot, patientFolderName);
+      await ensureDir(patientFolderPath);
+      
+      // Extract card name and extension
+      const cardNameWithoutExt = cardFileName.replace(/\.[^/.]+$/, '');
+      const cardExt = extname(cardFileName);
+      
+      // Create destination filename: PatientFolderName_CardName.ext
+      const destinationFileName = `${patientFolderName}_${cardNameWithoutExt}${cardExt}`;
+      const destinationPath = path.join(patientFolderPath, destinationFileName);
+      
+      // Copy the file
+      await fs.copyFile(sourceCardPath, destinationPath);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error copying patient card:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // Delete patient card
+  ipcMain.handle("patientCards:delete", async (_e, cardFileName: string) => {
+    try {
+      const cardPath = path.join(patientCardsRoot, cardFileName);
+      
+      // Check if file exists
+      if (!(await exists(cardPath))) {
+        return { success: false, error: "Patient card not found" };
+      }
+      
+      // Delete the file
+      await fs.unlink(cardPath);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error deleting patient card:', error);
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // Open patient card file
+  ipcMain.handle("patientCards:openPatientCard", async (_e, patientFolderName: string, cardFileName: string) => {
+    try {
+      // Construct the path to the patient card in the patient's folder
+      const cardNameWithoutExt = cardFileName.replace(/\.[^/.]+$/, '');
+      const cardExt = path.extname(cardFileName);
+      const patientCardFileName = `${patientFolderName}_${cardNameWithoutExt}${cardExt}`;
+      const patientCardPath = path.join(patientsRoot, patientFolderName, patientCardFileName);
+      
+      // Check if file exists
+      if (!(await exists(patientCardPath))) {
+        return { success: false, error: "Patient card not found in patient folder" };
+      }
+      
+      // Open the file
+      const result = await shell.openPath(patientCardPath);
+      if (result === "") {
+        return { success: true, error: null };
+      } else {
+        // If opening file failed, try opening the folder containing the file
+        console.log('Failed to open patient card, trying to open folder:', result);
+        const folderPath = path.dirname(patientCardPath);
+        const folderResult = await shell.openPath(folderPath);
+        return { 
+          success: folderResult === "", 
+          error: folderResult === "" ? null : folderResult,
+          fallbackUsed: true 
+        };
+      }
+    } catch (error) {
+      console.error('Error opening patient card:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
   });

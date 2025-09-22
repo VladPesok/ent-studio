@@ -34,7 +34,6 @@ function hasAudio(video: HTMLVideoElement): boolean {
     return (video.audioTracks as any).length > 0;
   }
   
-  // Fallback: assume audio exists if we can't detect
   return true;
 }
 /**

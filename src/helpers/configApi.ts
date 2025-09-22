@@ -45,7 +45,6 @@ export const createFolderName = (name: string): string => {
     .replace(/^_|_$/g, '');
 };
 
-/* ---------- Praat integration ---------- */
 export const selectPraatExecutable = async (): Promise<string | null> => {
   const result = await window.ipcRenderer.invoke("praat:selectExecutable");
   return result.success ? result.path : null;
@@ -54,4 +53,39 @@ export const selectPraatExecutable = async (): Promise<string | null> => {
 export const openFileWithPraat = async (praatPath: string, audioFilePath: string): Promise<boolean> => {
   const result = await window.ipcRenderer.invoke("praat:openFile", praatPath, audioFilePath);
   return result.success;
+};
+
+export const getPatientCards = async () => {
+  return await window.ipcRenderer.invoke("patientCards:get");
+};
+
+export const importPatientCard = async (cardName: string, file: File): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await window.ipcRenderer.invoke("patientCards:import", cardName, arrayBuffer, file.name);
+    return result;
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+};
+
+
+export const getDefaultPatientCard = async (): Promise<string | null> => {
+  return await window.ipcRenderer.invoke("defaultPatientCard:get");
+};
+
+export const setDefaultPatientCard = async (fileName: string | null): Promise<void> => {
+  await window.ipcRenderer.invoke("defaultPatientCard:set", fileName);
+};
+
+export const copyPatientCardToPatient = async (cardFileName: string, patientFolderName: string): Promise<{ success: boolean; error?: string }> => {
+  return await window.ipcRenderer.invoke("patientCards:copyToPatient", cardFileName, patientFolderName);
+};
+
+export const openPatientCard = async (patientFolderName: string, cardFileName: string): Promise<{ success: boolean; error?: string | null; fallbackUsed?: boolean }> => {
+  return await window.ipcRenderer.invoke("patientCards:openPatientCard", patientFolderName, cardFileName);
+};
+
+export const deletePatientCard = async (cardFileName: string): Promise<{ success: boolean; error?: string }> => {
+  return await window.ipcRenderer.invoke("patientCards:delete", cardFileName);
 };

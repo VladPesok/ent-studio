@@ -317,7 +317,7 @@ const PatientsList: React.FC = () => {
       ...getDateRangeProps('appointmentDate') as any,
     },
     {
-      title: "Лікар",
+      title: "Ведучий лікар",
       dataIndex: "doctor",
       key: "doctor",
       width: 240,
@@ -325,7 +325,7 @@ const PatientsList: React.FC = () => {
       ...getSelectProps(doctors, 'doctor'),
     },
     {
-      title: "Діагноз",
+      title: "Основний діагноз",
       dataIndex: "diagnosis",
       key: "diagnosis",
       width: 240,
@@ -360,7 +360,7 @@ const PatientsList: React.FC = () => {
     },
   ];
 
-  const handleAdd = async (folderBase: string, date: string, metadata: { doctor: string; diagnosis: string }) => {
+  const handleAdd = async (folderBase: string, date: string, metadata: { doctor: string; diagnosis: string; patientCard?: string }) => {
     // Extract name and birthdate from folderBase (format: surname_name_YYYY-MM-DD)
     const parts = folderBase.split('_');
     const surname = parts[0] || '';
@@ -371,10 +371,25 @@ const PatientsList: React.FC = () => {
       name: `${surname} ${name}`.trim(),
       birthdate,
       doctor: metadata.doctor,
-      diagnosis: metadata.diagnosis
+      diagnosis: metadata.diagnosis,
+      patientCard: metadata.patientCard || ""
     };
     
     await patientsApi.makePatient(folderBase, date, fullMetadata);
+    
+    // Copy patient card if selected
+    if (metadata.patientCard) {
+      try {
+        const configApi = await import('../../helpers/configApi');
+        const result = await configApi.copyPatientCardToPatient(metadata.patientCard, folderBase);
+        if (!result.success) {
+          console.error('Failed to copy patient card:', result.error);
+          // Note: We don't show an error to user as the patient was already created successfully
+        }
+      } catch (error) {
+        console.error('Failed to copy patient card:', error);
+      }
+    }
     
     setAddOpen(false);
     reloadPatients();

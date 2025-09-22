@@ -4,6 +4,7 @@ import { FolderOpenOutlined, DeleteOutlined, DownloadOutlined, SyncOutlined, Che
 import { useTranslation } from 'react-i18next';
 import * as configApi from "../../helpers/configApi";
 import * as versionsApi from "../../helpers/versionsApi";
+import PatientCards from "./PatientCards/PatientCards";
 
 const { Title, Paragraph } = Typography;
 const { useToken } = antTheme;
@@ -278,6 +279,8 @@ const Settings: React.FC = () => {
           </Paragraph>
         )}
       </Card>
+
+      <PatientCards />
 
       <Card title="Оновлення додатку" style={{ marginBottom: 24 }}>
         <Space direction="vertical" style={{ width: '100%', rowGap: 0 }}>

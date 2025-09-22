@@ -4,6 +4,7 @@ export interface Patient {
   latestAppointmentDate: string;
   doctor: string;
   diagnosis: string;
+  patientCard: string;
   folder: string; // Keep for backward compatibility
 }
 
@@ -20,6 +21,7 @@ export interface Appointment extends AppointmentConfig {
 export interface PatientConfig {
   doctor: string;
   diagnosis: string;
+  patientCard: string;
 }
 
 export interface Patient extends PatientConfig {
@@ -214,7 +216,7 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
 
 // USB and project operations
 export const scanUsb = (): Promise<Patient[]> => window.ipcRenderer.invoke("scanUsb");
-export const makePatient = (base: string, date: string, metadata?: { name: string; birthdate: string; doctor: string; diagnosis: string }) => window.ipcRenderer.invoke("patient:new", base, date, metadata);
+export const makePatient = (base: string, date: string, metadata?: { name: string; birthdate: string; doctor: string; diagnosis: string; patientCard?: string }) => window.ipcRenderer.invoke("patient:new", base, date, metadata);
 export const openPatientFolderInFs = (folder: string) => window.ipcRenderer.invoke("patient:openFolder", folder);
 
 // Patient data operations
@@ -239,7 +241,7 @@ export const getPatientMeta = async (folder: string): Promise<Patient> => {
 };
 
 // Save data to patient.config (patient-level)
-export const setPatient = (folder: string, data: { doctor?: string; diagnosis?: string }) =>
+export const setPatient = (folder: string, data: { doctor?: string; diagnosis?: string; patientCard?: string }) =>
   window.ipcRenderer.invoke("patient:setMeta", folder, data);
 
 // Save data to appointment.config (appointment-level)

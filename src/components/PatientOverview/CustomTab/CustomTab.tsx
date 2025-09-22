@@ -2,19 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Button, Space, message, Empty } from 'antd';
 import { 
   PlusOutlined, 
-  FolderOpenOutlined, 
-  FileOutlined, 
-  VideoCameraOutlined, 
-  AudioOutlined, 
-  FileTextOutlined, 
-  FilePdfOutlined, 
-  FileImageOutlined, 
-  FileZipOutlined,
-  FileExcelOutlined,
-  FileWordOutlined,
-  FilePptOutlined
+  FolderOpenOutlined
 } from '@ant-design/icons';
 import * as patientsApi from '../../../helpers/patientsApi';
+import { getFileIconByExtension } from '../../../helpers/fileTypeHelper';
 import './CustomTab.css';
 
 interface CustomTabProps {
@@ -49,54 +40,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
   };
 
-  const getFileIcon = (extension: string) => {
-    const ext = extension.toLowerCase();
-    
-    // Video files
-    if (['.mp4', '.avi', '.mov', '.wmv', '.flv', '.webm', '.mkv', '.m4v'].includes(ext)) {
-      return <VideoCameraOutlined />;
-    }
-    
-    // Audio files
-    if (['.mp3', '.wav', '.flac', '.aac', '.ogg', '.wma', '.m4a'].includes(ext)) {
-      return <AudioOutlined />;
-    }
-    
-    // Image files
-    if (['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg', '.webp', '.tiff'].includes(ext)) {
-      return <FileImageOutlined />;
-    }
-    
-    // Document files
-    if (['.pdf'].includes(ext)) {
-      return <FilePdfOutlined />;
-    }
-    
-    if (['.doc', '.docx'].includes(ext)) {
-      return <FileWordOutlined />;
-    }
-    
-    if (['.xls', '.xlsx'].includes(ext)) {
-      return <FileExcelOutlined />;
-    }
-    
-    if (['.ppt', '.pptx'].includes(ext)) {
-      return <FilePptOutlined />;
-    }
-    
-    // Text files
-    if (['.txt', '.md', '.rtf', '.csv'].includes(ext)) {
-      return <FileTextOutlined />;
-    }
-    
-    // Archive files
-    if (['.zip', '.rar', '.7z', '.tar', '.gz'].includes(ext)) {
-      return <FileZipOutlined />;
-    }
-    
-    // Default file icon
-    return <FileOutlined />;
-  };
+
 
   const loadFiles = async () => {
     setLoading(true);
@@ -220,7 +164,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
             onClick={() => handleOpenFile(file.path)}
           >
             <div className="file-card-icon">
-              {getFileIcon(file.extension)}
+              {getFileIconByExtension(file.extension)}
             </div>
             <div className="file-card-content">
               <h4 className="file-card-name" title={file.name}>
