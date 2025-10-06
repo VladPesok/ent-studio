@@ -19,7 +19,8 @@ export const setSession = (patch: Partial<{ currentDoctor: string|null }>) =>
 /* ---------- get / set shownTabs ---------- */
 export const getDefaultTabs = (): TabEntry[] => [
   { folder: "video" },
-  { folder: "audio" }
+  { folder: "audio" },
+  { folder: "tests" }
 ] as TabEntry[];
 
 export const getShownTabs = async (): Promise<TabEntry[]> => {

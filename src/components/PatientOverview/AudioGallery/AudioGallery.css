@@ -5,6 +5,11 @@
   height: 100%;
 }
 
+.audio-gallery-empty-wrap{
+  display: flex;
+  justify-content: center;
+}
+
 /* Header */
 .audio-gallery-header {
   display: flex;

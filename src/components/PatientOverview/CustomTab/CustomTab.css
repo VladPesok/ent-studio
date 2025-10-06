@@ -6,9 +6,8 @@
 }
 
 .custom-tab-empty-wrap {
-  height: 100%;
   display: flex;
-  flex-direction: column;
+  justify-content: center;
 }
 
 /* Header section */

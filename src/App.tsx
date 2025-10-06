@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import PatientsList    from "./components/PatientsList/PatientsList";
 import PatientOverview from "./components/PatientOverview/PatientOverview";
 import Settings        from "./components/Settings/Settings";
+import TestConstructor from "./components/TestConstructor/TestConstructor";
 
 import { AppConfigProvider, AppConfigContext } from "./holders/AppConfig";
 import AppHeader from "./wrappers/Header/Header";
@@ -59,6 +60,7 @@ const AppShell: React.FC = () => {
                 element={<PatientsList/>}
               />
               <Route path="/patients/:id" element={<PatientOverview />} />
+              <Route path="/tests"         element={<TestConstructor />} />
               <Route path="/settings"      element={<Settings />} />
               <Route
                 path="*"

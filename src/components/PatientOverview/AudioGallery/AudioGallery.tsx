@@ -182,7 +182,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
 
   if (!loading && audioFiles.length === 0) {
     return (
-      <div className="audio-gallery-wrap">
+      <div className="audio-gallery-empty-wrap">
         <div className="empty-state">
           <div className="empty-icon">🎵</div>
           <h3>Немає файлів</h3>

@@ -15,7 +15,8 @@ const DEFAULT_CFG = {
   session     : { currentDoctor: null as string | null },
   shownTabs   : [
     { name: "video_materials", folder: "video" },
-    { name: "voice_report", folder: "audio" }
+    { name: "voice_report", folder: "audio" },
+    { name: "tests", folder: "tests" }
   ] as { name: string; folder: string }[],
 };
 
@@ -36,6 +37,7 @@ const copySession = async (
   patientsRoot: string,
   usbDir: string,
   usbFolderName: string,
+  defaultPatientCard?: string | null,
 ) => {
   const m = usbFolderName.match(USB_PATTERN);
   if (!m) return;
@@ -51,7 +53,7 @@ const copySession = async (
 
   const patientConfigFile = path.join(patientRoot, "patient.config");
   if (!(await exists(patientConfigFile))) {
-    await fs.writeFile(patientConfigFile, JSON.stringify({ doctor: "", diagnosis: "" }, null, 2), "utf8");
+    await fs.writeFile(patientConfigFile, JSON.stringify({ doctor: "", diagnosis: "", patientCard: "" }, null, 2), "utf8");
   }
 
   const cfgFile = path.join(appointmentRoot, "appointment.config");
@@ -60,6 +62,38 @@ const copySession = async (
   if ((await fs.readdir(videoDir)).some(isClip)) return;
 
   await fs.cp(usbDir, videoDir, { recursive: true, force: false });
+
+  // Copy default patient card if available
+  if (defaultPatientCard) {
+    try {
+      const settingsRoot = path.join(app.getPath("userData"), "appData", "settings");
+      const patientCardsRoot = path.join(settingsRoot, "patientCards");
+      const sourceCardPath = path.join(patientCardsRoot, defaultPatientCard);
+      
+      // Check if source card exists
+      if (await exists(sourceCardPath)) {
+        // Extract card name and extension
+        const cardNameWithoutExt = defaultPatientCard.replace(/\.[^/.]+$/, '');
+        const cardExt = path.extname(defaultPatientCard);
+        
+        // Create destination filename: PatientFolderName_CardName.ext
+        const destinationFileName = `${patientBase}_${cardNameWithoutExt}${cardExt}`;
+        const destinationPath = path.join(patientRoot, destinationFileName);
+        
+        // Copy the file
+        await fs.copyFile(sourceCardPath, destinationPath);
+        
+        // Update patient.config to include the patient card
+        const currentConfig = await fs.readFile(patientConfigFile, 'utf8');
+        const config = JSON.parse(currentConfig);
+        config.patientCard = defaultPatientCard;
+        await fs.writeFile(patientConfigFile, JSON.stringify(config, null, 2), 'utf8');
+      }
+    } catch (error) {
+      console.error('Failed to copy patient card during USB import:', error);
+      // Don't throw error - USB import should continue even if card copy fails
+    }
+  }
 };
 
 const latestDate = async (patientRoot: string) => {
@@ -147,10 +181,14 @@ export const setFsOperations = async (): Promise<void> => {
 
     const usb = filePaths[0];
 
+    // Get default patient card
+    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
+    const defaultPatientCard = cfg.settings.defaultPatientCard;
+
     const entries = await fs.readdir(usb, { withFileTypes: true });
     for (const e of entries)
       if (e.isDirectory() && USB_PATTERN.test(e.name))
-        await copySession(patientsRoot, path.join(usb, e.name), e.name);
+        await copySession(patientsRoot, path.join(usb, e.name), e.name, defaultPatientCard);
 
     return buildProjects(patientsRoot);
   });
@@ -852,6 +890,340 @@ export const setFsOperations = async (): Promise<void> => {
     }
   });
 
+  // Medical Tests operations
+  const medicalTestsRoot = path.join(settingsRoot, "medicalTest");
+  await ensureDir(medicalTestsRoot);
+
+  ipcMain.handle("tests:getAll", async () => {
+    try {
+      const entries = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
+      
+      const tests = await Promise.all(
+        entries
+          .filter(entry => entry.isFile() && entry.name.endsWith('.json'))
+          .map(async (entry) => {
+            const filePath = path.join(medicalTestsRoot, entry.name);
+            const content = await fs.readFile(filePath, 'utf8');
+            return JSON.parse(content);
+          })
+      );
+      
+      return tests.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+    } catch (error) {
+      console.error('Error loading tests:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle("tests:getById", async (_e, testId: string) => {
+    try {
+      const files = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
+      
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith('.json')) {
+          const filePath = path.join(medicalTestsRoot, file.name);
+          const content = await fs.readFile(filePath, 'utf8');
+          const test = JSON.parse(content);
+          
+          if (test.id === testId) {
+            return test;
+          }
+        }
+      }
+      
+      throw new Error('Test not found');
+    } catch (error) {
+      console.error('Error loading test:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle("tests:create", async (_e, testData: any) => {
+    try {
+      const now = new Date().toISOString();
+      const testId = `test_${Date.now()}`;
+      
+      const test = {
+        id: testId,
+        ...testData,
+        createdAt: now,
+        updatedAt: now
+      };
+      
+      // Create filename based on test name (sanitized)
+      const sanitizedName = testData.name
+        .replace(/[^a-zA-Z0-9а-яА-ЯіІїЇєЄ\s]/g, '')
+        .replace(/\s+/g, '_')
+        .substring(0, 50);
+      
+      const fileName = `${sanitizedName}_${testId}.json`;
+      const filePath = path.join(medicalTestsRoot, fileName);
+      
+      await fs.writeFile(filePath, JSON.stringify(test, null, 2), 'utf8');
+      
+      return test;
+    } catch (error) {
+      console.error('Error creating test:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle("tests:update", async (_e, testId: string, testData: any) => {
+    try {
+      // Find the existing test file
+      const files = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
+      let existingFilePath = null;
+      let existingTest = null;
+      
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith('.json')) {
+          const filePath = path.join(medicalTestsRoot, file.name);
+          const content = await fs.readFile(filePath, 'utf8');
+          const test = JSON.parse(content);
+          
+          if (test.id === testId) {
+            existingFilePath = filePath;
+            existingTest = test;
+            break;
+          }
+        }
+      }
+      
+      if (!existingTest || !existingFilePath) {
+        throw new Error('Test not found');
+      }
+      
+      const updatedTest = {
+        ...existingTest,
+        ...testData,
+        id: testId,
+        createdAt: existingTest.createdAt,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Check if we need to rename the file (if name changed)
+      const sanitizedName = testData.name
+        .replace(/[^a-zA-Z0-9а-яА-ЯіІїЇєЄ\s]/g, '')
+        .replace(/\s+/g, '_')
+        .substring(0, 50);
+      
+      const newFileName = `${sanitizedName}_${testId}.json`;
+      const newFilePath = path.join(medicalTestsRoot, newFileName);
+      
+      // Write to new file path
+      await fs.writeFile(newFilePath, JSON.stringify(updatedTest, null, 2), 'utf8');
+      
+      // Delete old file if path changed
+      if (existingFilePath !== newFilePath) {
+        await fs.unlink(existingFilePath);
+      }
+      
+      return updatedTest;
+    } catch (error) {
+      console.error('Error updating test:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle("tests:delete", async (_e, testId: string) => {
+    try {
+      const files = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
+      
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith('.json')) {
+          const filePath = path.join(medicalTestsRoot, file.name);
+          const content = await fs.readFile(filePath, 'utf8');
+          const test = JSON.parse(content);
+          
+          if (test.id === testId) {
+            await fs.unlink(filePath);
+            return { success: true };
+          }
+        }
+      }
+      
+      throw new Error('Test not found');
+    } catch (error) {
+      console.error('Error deleting test:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle("tests:validateName", async (_e, name: string, excludeId?: string) => {
+    try {
+      const files = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
+      
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith('.json')) {
+          const filePath = path.join(medicalTestsRoot, file.name);
+          const content = await fs.readFile(filePath, 'utf8');
+          const test = JSON.parse(content);
+          
+          if (test.name.toLowerCase() === name.toLowerCase() && test.id !== excludeId) {
+            return false; // Name already exists
+          }
+        }
+      }
+      
+      return true; // Name is available
+    } catch (error) {
+      console.error('Error validating test name:', error);
+      return false;
+    }
+  });
+
+  ipcMain.handle("tests:openFolder", async () => {
+    try {
+      const result = await shell.openPath(medicalTestsRoot);
+      if (result === "") {
+        return { success: true, error: null };
+      } else {
+        console.log('Failed to open tests folder:', result);
+        return { 
+          success: false, 
+          error: result 
+        };
+      }
+    } catch (error) {
+      console.error('Error opening tests folder:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  });
+
+  ipcMain.handle("tests:export", async (_e, testId: string) => {
+    try {
+      // Find the test file
+      const files = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
+      let testData = null;
+      
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith('.json')) {
+          const filePath = path.join(medicalTestsRoot, file.name);
+          const content = await fs.readFile(filePath, 'utf8');
+          const test = JSON.parse(content);
+          
+          if (test.id === testId) {
+            testData = test;
+            break;
+          }
+        }
+      }
+      
+      if (!testData) {
+        return { success: false, error: 'Test not found' };
+      }
+      
+      // Show save dialog
+      const currentDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const sanitizedName = testData.name.replace(/[^a-zA-Z0-9а-яА-ЯіІїЇєЄ\s]/g, '').replace(/\s+/g, '_');
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: 'Export Test',
+        defaultPath: `${sanitizedName}_${currentDate}.json`,
+        filters: [
+          { name: 'JSON Files', extensions: ['json'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+      
+      if (canceled || !filePath) {
+        return { success: false, error: 'Export cancelled' };
+      }
+      
+      // Write test data to selected file
+      await fs.writeFile(filePath, JSON.stringify(testData, null, 2), 'utf8');
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error exporting test:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  });
+
+  ipcMain.handle("tests:import", async () => {
+    try {
+      // Show open dialog
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: 'Import Test',
+        filters: [
+          { name: 'JSON Files', extensions: ['json'] },
+          { name: 'All Files', extensions: ['*'] }
+        ],
+        properties: ['openFile']
+      });
+      
+      if (canceled || !filePaths.length) {
+        return { success: false, error: 'Import cancelled' };
+      }
+      
+      // Read and parse the test file
+      const filePath = filePaths[0];
+      const content = await fs.readFile(filePath, 'utf8');
+      const testData = JSON.parse(content);
+      
+      // Validate basic test structure
+      if (!testData.name || !testData.description || !testData.testType) {
+        return { success: false, error: 'Invalid test file format' };
+      }
+      
+      // Generate new ID and update timestamps
+      const now = new Date().toISOString();
+      const importedTest = {
+        ...testData,
+        id: `test_${Date.now()}`,
+        createdAt: now,
+        updatedAt: now
+      };
+      
+      // Check for name conflicts and modify if necessary
+      let finalName = importedTest.name;
+      let counter = 1;
+      
+      while (true) {
+        const files = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
+        let nameExists = false;
+        
+        for (const file of files) {
+          if (file.isFile() && file.name.endsWith('.json')) {
+            const existingFilePath = path.join(medicalTestsRoot, file.name);
+            const existingContent = await fs.readFile(existingFilePath, 'utf8');
+            const existingTest = JSON.parse(existingContent);
+            
+            if (existingTest.name.toLowerCase() === finalName.toLowerCase()) {
+              nameExists = true;
+              break;
+            }
+          }
+        }
+        
+        if (!nameExists) break;
+        
+        finalName = `${importedTest.name} (${counter})`;
+        counter++;
+      }
+      
+      importedTest.name = finalName;
+      
+      // Save the imported test
+      const fileName = `${importedTest.name.replace(/[^a-zA-Z0-9]/g, '_')}_${importedTest.id}.json`;
+      const testFilePath = path.join(medicalTestsRoot, fileName);
+      await fs.writeFile(testFilePath, JSON.stringify(importedTest, null, 2), 'utf8');
+      
+      return { success: true, test: importedTest };
+    } catch (error) {
+      console.error('Error importing test:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : String(error) 
+      };
+    }
+  });
+
   // Open patient card file
   ipcMain.handle("patientCards:openPatientCard", async (_e, patientFolderName: string, cardFileName: string) => {
     try {
@@ -884,6 +1256,173 @@ export const setFsOperations = async (): Promise<void> => {
     } catch (error) {
       console.error('Error opening patient card:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  // Patient Test operations
+
+  ipcMain.handle("patientTests:getAll", async (_e, folder: string, currentAppointment?: string) => {
+    try {
+      let testsDir: string;
+      if (currentAppointment) {
+        testsDir = path.join(patientsRoot, folder, currentAppointment, "tests");
+      } else {
+        const apptDir = await latestAppointmentDir(patientsRoot, folder);
+        testsDir = path.join(apptDir, "tests");
+      }
+      
+      await ensureDir(testsDir);
+      const entries = await fs.readdir(testsDir, { withFileTypes: true });
+      
+      const tests = await Promise.all(
+        entries
+          .filter(entry => entry.isFile() && entry.name.endsWith('.json'))
+          .map(async (entry) => {
+            const filePath = path.join(testsDir, entry.name);
+            const content = await fs.readFile(filePath, 'utf8');
+            return JSON.parse(content);
+          })
+      );
+      
+      return tests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } catch (error) {
+      console.error('Error loading patient tests:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle("patientTests:create", async (_e, folder: string, currentAppointment: string | undefined, testId: string, testData: any) => {
+    try {
+      let testsDir: string;
+      if (currentAppointment) {
+        testsDir = path.join(patientsRoot, folder, currentAppointment, "tests");
+      } else {
+        const apptDir = await latestAppointmentDir(patientsRoot, folder);
+        testsDir = path.join(apptDir, "tests");
+      }
+      
+      await ensureDir(testsDir);
+      
+      const now = new Date().toISOString();
+      const patientTest = {
+        id: `patient_test_${Date.now()}`,
+        testId,
+        testName: testData.name,
+        testType: testData.testType,
+        createdAt: now,
+        updatedAt: now,
+        testData: {
+          questions: testData.testData.questions,
+          diagnosisRanges: testData.testData.diagnosisRanges,
+          answerOptions: testData.testData.answerOptions
+        },
+        progress: {
+          currentQuestionIndex: 0,
+          answers: [],
+          completed: false,
+          score: 0,
+          diagnosis: null,
+          completedAt: null
+        }
+      };
+      
+      // Create filename based on test name (sanitized)
+      const sanitizedName = testData.name
+        .replace(/[^a-zA-Z0-9а-яА-ЯіІїЇєЄ\s]/g, '')
+        .replace(/\s+/g, '_')
+        .substring(0, 50);
+      
+      const fileName = `${sanitizedName}_${patientTest.id}.json`;
+      const filePath = path.join(testsDir, fileName);
+      
+      await fs.writeFile(filePath, JSON.stringify(patientTest, null, 2), 'utf8');
+      
+      return patientTest;
+    } catch (error) {
+      console.error('Error creating patient test:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle("patientTests:update", async (_e, folder: string, currentAppointment: string | undefined, patientTestId: string, progressData: any) => {
+    try {
+      let testsDir: string;
+      if (currentAppointment) {
+        testsDir = path.join(patientsRoot, folder, currentAppointment, "tests");
+      } else {
+        const apptDir = await latestAppointmentDir(patientsRoot, folder);
+        testsDir = path.join(apptDir, "tests");
+      }
+      
+      const files = await fs.readdir(testsDir, { withFileTypes: true });
+      let existingFilePath = null;
+      let existingTest = null;
+      
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith('.json')) {
+          const filePath = path.join(testsDir, file.name);
+          const content = await fs.readFile(filePath, 'utf8');
+          const test = JSON.parse(content);
+          
+          if (test.id === patientTestId) {
+            existingFilePath = filePath;
+            existingTest = test;
+            break;
+          }
+        }
+      }
+      
+      if (!existingTest || !existingFilePath) {
+        throw new Error('Patient test not found');
+      }
+      
+      const updatedTest = {
+        ...existingTest,
+        progress: {
+          ...existingTest.progress,
+          ...progressData
+        },
+        updatedAt: new Date().toISOString()
+      };
+      
+      await fs.writeFile(existingFilePath, JSON.stringify(updatedTest, null, 2), 'utf8');
+      
+      return updatedTest;
+    } catch (error) {
+      console.error('Error updating patient test:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle("patientTests:delete", async (_e, folder: string, currentAppointment: string | undefined, patientTestId: string) => {
+    try {
+      let testsDir: string;
+      if (currentAppointment) {
+        testsDir = path.join(patientsRoot, folder, currentAppointment, "tests");
+      } else {
+        const apptDir = await latestAppointmentDir(patientsRoot, folder);
+        testsDir = path.join(apptDir, "tests");
+      }
+      
+      const files = await fs.readdir(testsDir, { withFileTypes: true });
+      
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith('.json')) {
+          const filePath = path.join(testsDir, file.name);
+          const content = await fs.readFile(filePath, 'utf8');
+          const test = JSON.parse(content);
+          
+          if (test.id === patientTestId) {
+            await fs.unlink(filePath);
+            return { success: true };
+          }
+        }
+      }
+      
+      throw new Error('Patient test not found');
+    } catch (error) {
+      console.error('Error deleting patient test:', error);
+      throw error;
     }
   });
 };

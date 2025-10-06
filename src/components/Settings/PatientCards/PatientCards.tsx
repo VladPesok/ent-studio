@@ -4,6 +4,7 @@ import { PlusOutlined, FileTextOutlined, StarOutlined, DeleteOutlined } from '@a
 import ImportPatientCardModal from './ImportPatientCardModal';
 import { AppConfigContext, PatientCard } from '../../../holders/AppConfig';
 import * as configApi from '../../../helpers/configApi';
+import * as patientsApi from '../../../helpers/patientsApi';
 
 const { Paragraph } = Typography;
 
@@ -34,10 +35,7 @@ const PatientCards: React.FC = () => {
 
   const handleOpenCard = async (card: PatientCard) => {
     try {
-      const result = await configApi.openPatientCard(card.path);
-      if (!result.success) {
-        message.error('Не вдалося відкрити файл');
-      }
+      await patientsApi.openFileInDefaultApp(card.path);
     } catch (error) {
       console.error('Failed to open patient card:', error);
       message.error('Помилка відкриття файлу');

@@ -20,12 +20,14 @@ import {
   CalendarOutlined,
   FolderOpenOutlined,
   PlusOutlined,
+  ExperimentOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 
 import VideoGallery from "./VideoGallery/VideoGallery";
 import AudioGallery from "./AudioGallery/AudioGallery";
 import CustomTab from "./CustomTab/CustomTab";
+import TestTab from "./TestTab/TestTab";
 import CreatableSelect from "../../common/input/CreatableSelect";
 import AddAppointmentModal from "./AddAppointmentModal/AddAppointmentModal";
 import { AppConfigContext } from "../../holders/AppConfig";
@@ -315,6 +317,16 @@ const PatientOverview: React.FC = () => {
             ),
             children: <AudioGallery baseFolder={folder} currentAppointment={currentAppointment} />,
           };
+        } else if (tab.folder === 'tests') {
+          return {
+            key,
+            label: (
+              <>
+                <ExperimentOutlined /> {t(tab.folder)}
+              </>
+            ),
+            children: <TestTab baseFolder={folder} currentAppointment={currentAppointment} />,
+          };
         } else {
           // Custom tab
           return {
@@ -348,6 +360,16 @@ const PatientOverview: React.FC = () => {
             </>
           ),
           children: <AudioGallery baseFolder={folder} currentAppointment={currentAppointment} />,
+        };
+      } else if (tab.folder === 'tests') {
+        return {
+          key,
+          label: (
+            <>
+              <ExperimentOutlined /> {t(tab.folder)}
+            </>
+          ),
+          children: <TestTab baseFolder={folder} currentAppointment={currentAppointment} />,
         };
       } else {
         // Custom tab

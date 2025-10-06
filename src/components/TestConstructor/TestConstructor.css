@@ -1,0 +1,257 @@
+/* Test Constructor Main Container */
+.test-constructor-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  background: #f5f5f5;
+}
+
+.test-constructor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.test-constructor-header h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #262626;
+}
+
+.clickable-title {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin: -8px -12px; /* Negative margin to expand clickable area */
+}
+
+.clickable-title:hover {
+  color: #1890ff;
+  background-color: #f0f9ff;
+}
+
+/* Test List Container */
+.test-list-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #f0f0f0;
+  border-top: 3px solid #1890ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.test-card-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.test-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  cursor: help;
+}
+
+.test-created-date {
+  font-size: 12px;
+  font-weight: 400;
+  color: #8c8c8c;
+}
+
+.test-card-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.test-card{
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  
+  .ant-card-body{
+    padding-bottom: 10px;
+  }
+}
+
+.test-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 120px;
+}
+
+.test-description {
+  color: #595959;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.test-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #8c8c8c;
+}
+
+.test-meta span {
+  display: flex;
+  align-items: center;
+}
+
+.test-meta span::before {
+  content: "•";
+  margin-right: 6px;
+  color: #1890ff;
+}
+
+.test-dates {
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.test-dates small {
+  color: #bfbfbf;
+  font-size: 11px;
+}
+
+.test-card-footer {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 12px;
+  margin-top: 16px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Dark theme support */
+[data-theme="dark"] .test-constructor-container {
+  background: #141414;
+}
+
+[data-theme="dark"] .test-constructor-header {
+  border-bottom-color: #303030;
+}
+
+[data-theme="dark"] .test-constructor-header h1 {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .test-card {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+[data-theme="dark"] .test-card:hover {
+  border-color: #1890ff;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.25);
+}
+
+[data-theme="dark"] .test-description {
+  color: #d9d9d9;
+}
+
+[data-theme="dark"] .test-meta {
+  color: #a6a6a6;
+}
+
+[data-theme="dark"] .test-dates {
+  border-top-color: #303030;
+}
+
+[data-theme="dark"] .test-dates small {
+  color: #737373;
+}
+
+[data-theme="dark"] .test-name {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .test-created-date {
+  color: #8c8c8c;
+}
+
+[data-theme="dark"] .test-card-footer {
+  border-top-color: #303030;
+}
+
+[data-theme="dark"] .clickable-title:hover {
+  color: #1890ff;
+  background-color: #111b26;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .test-constructor-container {
+    padding: 16px;
+  }
+  
+  .test-constructor-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  
+  .test-constructor-header h1 {
+    font-size: 24px;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .test-constructor-container {
+    padding: 12px;
+  }
+  
+  .test-constructor-header h1 {
+    font-size: 20px;
+  }
+  
+  .test-card-content {
+    min-height: 100px;
+  }
+}

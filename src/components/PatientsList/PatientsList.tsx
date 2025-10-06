@@ -264,7 +264,7 @@ const PatientsList: React.FC = () => {
     if (tableState.filters.bithdate) activeFilters.push('Дата народження');
     if (tableState.filters.appointmentDate) activeFilters.push('Дата прийому');
     if (tableState.filters.doctor && tableState.filters.doctor.length > 0) activeFilters.push(`Лікарі: ${tableState.filters.doctor.length}`);
-    if (tableState.filters.diagnosis && tableState.filters.diagnosis.length > 0) activeFilters.push(`Діагнози: ${tableState.filters.diagnosis.length}`);
+    if (tableState.filters.diagnosis && tableState.filters.diagnosis.length > 0) activeFilters.push(`Діагноз: ${tableState.filters.diagnosis.length}`);
     return activeFilters;
   };
 
@@ -330,7 +330,7 @@ const PatientsList: React.FC = () => {
       key: "diagnosis",
       width: 240,
       sorter: true,
-      ...getSelectProps(diagnoses, 'diagnosis'),
+      ...getColumnSearchProps('diagnosis', "Основний діагноз"),
     },
     {
       title: "",
@@ -352,7 +352,7 @@ const PatientsList: React.FC = () => {
     {
       key: "usb",
       icon: <UsbOutlined />,
-      label: "Імпорт з USB",
+      label: "Імпорт з папки",
       onClick: async () => {
         await patientsApi.scanUsb();
         reloadPatients();

@@ -1,0 +1,109 @@
+/* Test Editor Container */
+.test-editor-container {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #f5f5f5;
+  overflow: hidden;
+}
+
+.test-editor-content {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 24px;
+}
+
+.test-editor-collapse {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.test-editor-footer {
+  height: 64px;
+  background: white;
+  border-top: 1px solid #e8e8e8;
+  border-left: 1px solid #e8e8e8;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.footer-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+}
+
+/* Test Cards */
+.test-metadata-card,
+.test-questions-card,
+.test-diagnosis-card {
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.test-editor-collapse{
+  margin-bottom: 16px; 
+}
+
+/* Collapse Panel Header Styling */
+.test-editor-collapse .ant-collapse-header {
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.test-editor-collapse .ant-collapse-header:hover {
+  color: #1d4ed8;
+}
+
+/* Dark theme support */
+[data-theme="dark"] .test-editor-container {
+  background: #141414;
+} 
+
+[data-theme="dark"] .test-editor-collapse {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+[data-theme="dark"] .test-editor-footer {
+  background: #1f1f1f;
+  border-top-color: #303030;
+}
+
+[data-theme="dark"] .test-metadata-card,
+[data-theme="dark"] .test-questions-card,
+[data-theme="dark"] .test-diagnosis-card {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .test-editor-content {
+    padding: 16px;
+    padding-bottom: 90px; /* Reduced for medium buttons */
+  }
+  
+  .footer-content {
+    padding: 12px 16px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 480px) {
+  .test-editor-content {
+    padding: 12px;
+    padding-bottom: 100px; /* Slightly more space for stacked buttons */
+  }
+  
+  .footer-content {
+    padding: 10px 12px;
+  }
+}
