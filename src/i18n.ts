@@ -5,13 +5,21 @@ const resources = {
   en: {
     translation: {
       'video': 'Video Materials',
-      'audio': 'Voice Report'
+      'audio': 'Voice Report',
+      'tests': 'Tests',
+      'testTypes': {
+        'handicapIndex': 'Handicap Index Test'
+      }
     }
   },
   ua: {
     translation: {
       'video': 'Відео матеріали',
-      'audio': 'Голосовий звіт'
+      'audio': 'Голосовий звіт',
+      'tests': 'Тести',
+      'testTypes': {
+        'handicapIndex': 'Тест індексу обмежень'
+      }
     }
   }
 };

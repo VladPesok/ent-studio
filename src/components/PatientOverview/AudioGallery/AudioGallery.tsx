@@ -8,6 +8,9 @@ import {
 } from '@ant-design/icons';
 import RecordAudioModal from './RecordAudioModal/RecordAudioModal';
 import * as configApi from "../../../helpers/configApi";
+import * as patientsApi from "../../../helpers/patientsApi";
+import { getFileIconByExtension, getFileType } from '../../../helpers/fileTypeHelper';
+import type { FileType } from '../../../helpers/fileTypeHelper';
 
 import "./AudioGallery.css";
 
@@ -18,7 +21,8 @@ interface AudioFile {
   size: number;
   extension: string;
   modified: Date;
-  fileType: string;
+  fileType: FileType;
+  isAudio: boolean;
 }
 
 interface AudioGalleryProps {
@@ -64,7 +68,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
   const loadAudioFiles = useCallback(async () => {
     setLoading(true);
     try {
-      const files = await window.electronAPI.getAudioFiles(baseFolder, currentAppointment);
+      const files = await patientsApi.getAudioFiles(baseFolder, currentAppointment);
       setAudioFiles(files);
       setTotal(files.length);
     } catch (error) {
@@ -89,20 +93,20 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
     loadPraatPath();
   }, [loadAudioFiles]);
 
-  const handleLoadMoreAudio = async () => {
+  const handleLoadMoreFiles = async () => {
     try {
-      const result = await window.electronAPI.loadMoreAudio(baseFolder, currentAppointment);
+      const result = await patientsApi.loadMoreAudio(baseFolder, currentAppointment);
       if (result.success && result.count > 0) {
         loadAudioFiles();
       }
     } catch (error) {
-      console.error("Failed to load more audio:", error);
+      console.error("Failed to load more files:", error);
     }
   };
 
   const handleOpenAudioFolder = async () => {
     try {
-      await window.electronAPI.openAudioFolder(baseFolder, currentAppointment);
+      await patientsApi.openAudioFolder(baseFolder, currentAppointment);
     } catch (error) {
       console.error("Failed to open audio folder:", error);
     }
@@ -117,7 +121,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
   const handleSaveRecording = async (audioBlob: Blob, filename: string) => {
     try {
       const arrayBuffer = await audioBlob.arrayBuffer();
-      const result = await window.electronAPI.saveRecordedAudio(
+      const result = await patientsApi.saveRecordedAudio(
         baseFolder, 
         currentAppointment, 
         arrayBuffer, 
@@ -155,12 +159,22 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
     }
   };
 
+  const handleOpenFile = async (file: AudioFile) => {
+    try {
+      await patientsApi.openFileInDefaultApp(file.path);
+      message.success(`Файл ${file.fileName} відкрито`);
+    } catch (error) {
+      console.error('Error opening file:', error);
+      message.error('Помилка при відкритті файлу');
+    }
+  };
+
   if (loading && audioFiles.length === 0) {
     return (
       <div className="audio-gallery-wrap">
         <div className="loading-state">
           <div className="loading-spinner"></div>
-          <p>Завантаження аудіо файлів...</p>
+          <p>Завантаження файлів...</p>
         </div>
       </div>
     );
@@ -168,11 +182,11 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
 
   if (!loading && audioFiles.length === 0) {
     return (
-      <div className="audio-gallery-wrap">
+      <div className="audio-gallery-empty-wrap">
         <div className="empty-state">
           <div className="empty-icon">🎵</div>
-          <h3>Немає аудіо файлів</h3>
-          <p>Додайте аудіо файли до цього прийому</p>
+          <h3>Немає файлів</h3>
+          <p>Додайте файли до цього прийому</p>
           <Space>
             <Button 
               type="primary" 
@@ -183,7 +197,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
             </Button>
             <Button 
               icon={<PlusOutlined />} 
-              onClick={handleLoadMoreAudio}
+              onClick={handleLoadMoreFiles}
             >
               Додати файли
             </Button>
@@ -209,7 +223,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
     <div className="audio-gallery-wrap">
       <div className="audio-gallery-header">
         <div className="gallery-info">
-          <h3>Аудіо матеріали ({total})</h3>
+          <h3>Матеріали ({total})</h3>
         </div>
         <div className="gallery-actions">
           <Space>
@@ -222,7 +236,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
             </Button>
             <Button 
               icon={<PlusOutlined />} 
-              onClick={handleLoadMoreAudio}
+              onClick={handleLoadMoreFiles}
             >
               Додати файли
             </Button>
@@ -237,57 +251,70 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
       </div>
 
       <div className="audio-files-list">
-        {audioFiles.map((audioFile) => (
-          <div key={audioFile.url} className="audio-file-item">
+        {audioFiles.map((file) => (
+          <div key={file.url} className="audio-file-item">
             <div className="audio-file-info">
               <div className="audio-file-main">
+                <div className="file-icon" style={{ fontSize: '24px', marginRight: '12px', color: '#1890ff' }}>
+                  {getFileIconByExtension(file.extension)}
+                </div>
                 <div className="audio-file-details">
                   <div className="audio-file-header">
                     <div className="audio-file-title-row">
-                      <h4 className="audio-file-name" title={audioFile.fileName}>
-                        {audioFile.fileName}
+                      <h4 
+                        className="audio-file-name" 
+                        title={file.fileName}
+                        style={{ cursor: file.isAudio ? 'default' : 'pointer' }}
+                        onClick={file.isAudio ? undefined : () => handleOpenFile(file)}
+                      >
+                        {file.fileName}
                       </h4>
-                      {praatPath && (
-                        <Button
-                          size="small"
-                          icon={<ExperimentOutlined />}
-                          onClick={() => handleOpenWithPraat(audioFile)}
-                          title="Відкрити в Praat"
-                          className="praat-button"
-                        >
-                          Praat
-                        </Button>
-                      )}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        {praatPath && file.isAudio && (
+                          <Button
+                            size="small"
+                            icon={<ExperimentOutlined />}
+                            onClick={() => handleOpenWithPraat(file)}
+                            title="Відкрити в Praat"
+                            className="praat-button"
+                          >
+                            Praat
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <div className="audio-file-meta">
-                      <span className="file-size">{formatFileSize(audioFile.size)}</span>
-                      <span className="file-ext">{audioFile.extension.toUpperCase()}</span>
-                      <span className="file-date">{formatDate(audioFile.modified)}</span>
+                      <span className="file-size">{formatFileSize(file.size)}</span>
+                      <span className="file-ext">{file.extension.toUpperCase()}</span>
+                      <span className="file-date">{formatDate(file.modified)}</span>
+                      <span className="file-type">{file.fileType}</span>
                     </div>
                   </div>
                 </div>
               </div>
-              <div className="audio-controls">
-                <audio
-                  ref={(el) => {
-                    if (el) {
-                      audioRefs.current[audioFile.url] = el;
-                    }
-                  }}
-                  src={audioFile.url}
-                  preload="metadata"
-                  onEnded={() => handleAudioEnded(audioFile)}
-                  onLoadedMetadata={(e) => {
-                    const duration = getDuration(e.currentTarget);
-                    const durationEl = document.getElementById(`duration-${audioFile.url}`);
-                    if (duration && durationEl) {
-                      durationEl.textContent = duration;
-                    }
-                  }}
-                  controls
-                  className="audio-player"
-                />
-              </div>
+              {file.isAudio && (
+                <div className="audio-controls">
+                  <audio
+                    ref={(el) => {
+                      if (el) {
+                        audioRefs.current[file.url] = el;
+                      }
+                    }}
+                    src={file.url}
+                    preload="metadata"
+                    onEnded={() => handleAudioEnded(file)}
+                    onLoadedMetadata={(e) => {
+                      const duration = getDuration(e.currentTarget);
+                      const durationEl = document.getElementById(`duration-${file.url}`);
+                      if (duration && durationEl) {
+                        durationEl.textContent = duration;
+                      }
+                    }}
+                    controls
+                    className="audio-player"
+                  />
+                </div>
+              )}
             </div>
           </div>
         ))}

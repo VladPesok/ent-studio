@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from "react";
-import { Modal, Form, Input, DatePicker, Row, Col, Divider, Typography } from "antd";
-import { UserOutlined, CalendarOutlined, MedicineBoxOutlined } from "@ant-design/icons";
+import React, { useState, useEffect, useContext } from "react";
+import { Modal, Form, Input, DatePicker, Row, Col, Divider, Typography, Select } from "antd";
+import { UserOutlined, CalendarOutlined, MedicineBoxOutlined, FileTextOutlined } from "@ant-design/icons";
 import dayjs, { Dayjs } from "dayjs";
 import "dayjs/locale/uk";
-import { getDictionaries, addDictionaryEntry } from "../../../helpers/configApi";
-import { setPatient } from "../../../helpers/patientsApi";
+import { AppConfigContext } from "../../../holders/AppConfig";
 import CreatableSelect from "../../../common/input/CreatableSelect";
 import "./AddCardModal.css";
 
@@ -13,7 +12,7 @@ dayjs.locale("uk");
 const { Title, Text } = Typography;
 
 interface Props {
-  onOk(folderBase: string, visitDate: string): void;
+  onOk(folderBase: string, visitDate: string, metadata: { doctor: string; diagnosis: string; patientCard?: string }): Promise<void>;
   onClose(): void;
 }
 
@@ -24,37 +23,37 @@ type FormValues = {
   visitDate: Dayjs;
   doctor?: string;
   diagnosis?: string;
+  patientCard?: string;
 };
 
 const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
   const [form] = Form.useForm<FormValues>();
-  const [dictionaries, setDictionaries] = useState<{ doctors: string[]; diagnosis: string[] }>({
-    doctors: [],
-    diagnosis: []
-  });
+  const { 
+    doctors, 
+    diagnoses, 
+    addDoctor, 
+    addDiagnosis,
+    patientCards,
+    defaultPatientCard,
+    getEffectiveDefaultCard
+  } = useContext(AppConfigContext);
   const [loading, setLoading] = useState(false);
 
   const fmt = (d: Dayjs) => d.format("YYYY-MM-DD");
 
+  // Set default patient card selection when component mounts
   useEffect(() => {
-    const loadDictionaries = async () => {
-      try {
-        const dicts = await getDictionaries();
-        setDictionaries(dicts);
-      } catch (error) {
-        console.error("Failed to load dictionaries:", error);
+    if (patientCards.length > 0) {
+      const effectiveDefault = getEffectiveDefaultCard();
+      if (effectiveDefault) {
+        form.setFieldValue('patientCard', effectiveDefault);
       }
-    };
-    loadDictionaries();
-  }, []);
+    }
+  }, [patientCards, defaultPatientCard, form, getEffectiveDefaultCard]);
 
   const handleCreateDoctor = async (value: string) => {
     try {
-      await addDictionaryEntry("doctors", value);
-      setDictionaries(prev => ({
-        ...prev,
-        doctors: [...prev.doctors, value]
-      }));
+      await addDoctor(value);
     } catch (error) {
       console.error("Failed to add doctor:", error);
     }
@@ -62,11 +61,7 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
 
   const handleCreateDiagnosis = async (value: string) => {
     try {
-      await addDictionaryEntry("diagnosis", value);
-      setDictionaries(prev => ({
-        ...prev,
-        diagnosis: [...prev.diagnosis, value]
-      }));
+      await addDiagnosis(value);
     } catch (error) {
       console.error("Failed to add diagnosis:", error);
     }
@@ -78,20 +73,12 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
       const v = await form.validateFields();
       const folderBase = `${v.surname.trim()}_${v.name.trim()}_${fmt(v.dob)}`;
       
-      // Create patient first
-      await onOk(folderBase, fmt(v.visitDate));
-      
-      // Save patient metadata if provided
-      if (v.doctor || v.diagnosis) {
-        try {
-          await setPatient(folderBase, {
-            doctor: v.doctor || "",
-            diagnosis: v.diagnosis || ""
-          });
-        } catch (error) {
-          console.error("Failed to save patient metadata:", error);
-        }
-      }
+      // Pass metadata to parent component for proper sequencing
+      await onOk(folderBase, fmt(v.visitDate), {
+        doctor: v.doctor || "",
+        diagnosis: v.diagnosis || "",
+        patientCard: v.patientCard
+      });
     } catch {
       // Form validation failed
     } finally {
@@ -161,58 +148,55 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
               </Col>
             </Row>
 
-            <Form.Item
-              label="Дата народження"
-              name="dob"
-              rules={[
-                { required: true, message: "Вкажіть дату народження" },
-                {
-                  validator: (_, value) =>
-                    value && value.isValid()
-                      ? Promise.resolve()
-                      : Promise.reject("Невірний формат дати"),
-                },
-              ]}
-            >
-              <DatePicker
-                allowClear={false}
-                format="DD-MM-YYYY"
-                style={{ width: "100%" }}
-                size="large"
-                prefix={<CalendarOutlined />}
-                placeholder="Оберіть дату народження"
-              />
-            </Form.Item>
-          </div>
-
-          <Divider />
-
-          <div className="form-section">
-            <Title level={5} className="section-title">
-              <CalendarOutlined /> Дата прийому
-            </Title>
-            
-            <Form.Item
-              label="Дата прийому"
-              name="visitDate"
-              rules={[
-                { required: true, message: "Вкажіть дату прийому" },
-                {
-                  validator: (_, value) =>
-                    value && value.isValid()
-                      ? Promise.resolve()
-                      : Promise.reject("Невірний формат дати"),
-                },
-              ]}
-            >
-              <DatePicker
-                allowClear={false}
-                format="DD-MM-YYYY"
-                style={{ width: "100%" }}
-                size="large"
-                placeholder="Оберіть дату прийому"
-              />
-            </Form.Item>
+            <Row gutter={16}>
+              <Col span={12}>
+                <Form.Item
+                  label="Дата народження"
+                  name="dob"
+                  rules={[
+                    { required: true, message: "Вкажіть дату народження" },
+                    {
+                      validator: (_, value) =>
+                        value && value.isValid()
+                          ? Promise.resolve()
+                          : Promise.reject("Невірний формат дати"),
+                    },
+                  ]}
+                >
+                  <DatePicker
+                    allowClear={false}
+                    format="DD-MM-YYYY"
+                    style={{ width: "100%" }}
+                    size="large"
+                    placeholder="Оберіть дату народження"
+                  />
+                </Form.Item>
+              </Col>
+              
+              <Col span={12}>
+                <Form.Item
+                  label="Дата прийому"
+                  name="visitDate"
+                  rules={[
+                    { required: true, message: "Вкажіть дату прийому" },
+                    {
+                      validator: (_, value) =>
+                        value && value.isValid()
+                          ? Promise.resolve()
+                          : Promise.reject("Невірний формат дати"),
+                    },
+                  ]}
+                >
+                  <DatePicker
+                    allowClear={false}
+                    format="DD-MM-YYYY"
+                    style={{ width: "100%" }}
+                    size="large"
+                    placeholder="Оберіть дату прийому"
+                  />
+                </Form.Item>
+              </Col>
+            </Row>
           </div>
 
           <Divider />
@@ -220,7 +204,6 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
           <div className="form-section optional-section">
             <Title level={5} className="section-title">
               <MedicineBoxOutlined /> Медична інформація 
-              <Text type="secondary" className="optional-label">(необов'язково)</Text>
             </Title>
             
             <Row gutter={16}>
@@ -231,7 +214,7 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
                  >
                    <CreatableSelect
                      value={form.getFieldValue('doctor') || null}
-                     items={dictionaries.doctors}
+                     items={doctors}
                      onChange={(value) => form.setFieldValue('doctor', value)}
                      onCreate={handleCreateDoctor}
                      placeholder="Оберіть або введіть лікаря"
@@ -247,11 +230,34 @@ const AddCardModal: React.FC<Props> = ({ onOk, onClose }) => {
                  >
                    <CreatableSelect
                      value={form.getFieldValue('diagnosis') || null}
-                     items={dictionaries.diagnosis}
+                     items={diagnoses}
                      onChange={(value) => form.setFieldValue('diagnosis', value)}
                      onCreate={handleCreateDiagnosis}
                      placeholder="Оберіть або введіть діагноз"
                      style={{ width: '100%' }}
+                   />
+                 </Form.Item>
+               </Col>
+              </Row>
+              <Row gutter={16}>
+               <Col span={24}>
+                 <Form.Item
+                   label="Картка пацієнта"
+                   name="patientCard"
+                   rules={[
+                     { required: true, message: "Оберіть картку пацієнта" }
+                   ]}
+                 >
+                   <Select
+                     placeholder="Оберіть картку пацієнта"
+                     style={{ width: '100%' }}
+                     disabled={patientCards.length === 0}
+                     notFoundContent={patientCards.length === 0 ? "Немає доступних карток" : "Не знайдено"}
+                     suffixIcon={<FileTextOutlined />}
+                     options={patientCards.map(card => ({
+                       label: card.name,
+                       value: card.name + card.extension
+                     }))}
                    />
                  </Form.Item>
                </Col>

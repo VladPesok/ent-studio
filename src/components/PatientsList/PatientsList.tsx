@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useContext } from "react";
 import { Table, Input, Button, Dropdown, theme as antTheme, MenuProps, DatePicker, Select, Space, Tag, Row, Col, Pagination } from "antd";
 import {
   EllipsisOutlined,
@@ -13,24 +13,20 @@ import AddCardModal from "./AddCardModal/AddCardModal";
 import type { ColumnsType } from "antd/es/table";
 import type { FilterDropdownProps } from "antd/es/table/interface";
 import * as patientsApi from "../../helpers/patientsApi";
-import * as configApi from "../../helpers/configApi";
+import { AppConfigContext } from "../../holders/AppConfig";
 import "./PatientsList.css";
 
 const { RangePicker } = DatePicker;
 
 const { useToken } = antTheme;
 
-export const splitName = (folder: string) => {
-  const [surname = "", name = "", dob = ""] = folder.split("_");
-  return { surname, name, dob };
-};
+
 
 const PatientsList: React.FC = () => {
+  const { doctors, diagnoses } = useContext(AppConfigContext);
   const [patients, setPatients] = useState<patientsApi.Patient[]>([]);
 
   const [addOpen, setAddOpen] = useState(false);
-
-  const [dicts, setDicts] = useState<{ doctors: string[]; diagnosis: string[] }>({ doctors: [], diagnosis: [] });
   const [tableState, setTableState] = useState<patientsApi.TableState>({
     pagination: { current: 1, pageSize: 10, total: 0 },
     filters: {},
@@ -214,18 +210,8 @@ const PatientsList: React.FC = () => {
     }));
   };
 
-  const loadDictionaries = async () => {
-    try {
-      const dictionaries = await configApi.getDictionaries();
-      setDicts(dictionaries);
-    } catch (error) {
-      console.error('Failed to load dictionaries:', error);
-    }
-  };
-
   useEffect(() => {
     reloadPatients();
-    loadDictionaries();
   }, []);
 
   const handleSearchChange = async (value: string) => {
@@ -278,7 +264,7 @@ const PatientsList: React.FC = () => {
     if (tableState.filters.bithdate) activeFilters.push('Дата народження');
     if (tableState.filters.appointmentDate) activeFilters.push('Дата прийому');
     if (tableState.filters.doctor && tableState.filters.doctor.length > 0) activeFilters.push(`Лікарі: ${tableState.filters.doctor.length}`);
-    if (tableState.filters.diagnosis && tableState.filters.diagnosis.length > 0) activeFilters.push(`Діагнози: ${tableState.filters.diagnosis.length}`);
+    if (tableState.filters.diagnosis && tableState.filters.diagnosis.length > 0) activeFilters.push(`Діагноз: ${tableState.filters.diagnosis.length}`);
     return activeFilters;
   };
 
@@ -296,47 +282,55 @@ const PatientsList: React.FC = () => {
   const columns: ColumnsType<patientsApi.Patient & { key: string }> = [
     {
       title: "Прізвище та ім'я",
-      dataIndex: "folder",
+      dataIndex: "name",
       key: "name",
-      render: (folder) => {
-        const { surname, name } = splitName(folder);
-        return <span style={{cursor: 'pointer'}} className="patient-cell">{`${surname} ${name}`}</span>;
+      render: (name) => {
+        return <span style={{cursor: 'pointer'}} className="patient-cell">{name}</span>;
       },
       sorter: true,
       ...getColumnSearchProps('name', "Прізвище та ім'я"),
     },
     {
       title: "Дата народження",
-      dataIndex: "folder",
+      dataIndex: "birthdate",
       key: "bithdate",
       width: 240,
-      render: (f) => splitName(f).dob,
+      render: (birthdate) => {
+        if (!birthdate) return '';
+        const date = new Date(birthdate);
+        return date.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric' });
+      },
       sorter: true,
       ...getDateRangeProps('bithdate') as any,
     },
     {
       title: "Дата останнього прийому",
-      dataIndex: "date",
+      dataIndex: "latestAppointmentDate",
       key: "appointmentDate",
       width: 240,
+      render: (latestAppointmentDate) => {
+        if (!latestAppointmentDate) return '';
+        const dateObj = new Date(latestAppointmentDate);
+        return dateObj.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric' });
+      },
       sorter: true,
       ...getDateRangeProps('appointmentDate') as any,
     },
     {
-      title: "Лікар",
+      title: "Ведучий лікар",
       dataIndex: "doctor",
       key: "doctor",
       width: 240,
       sorter: true,
-      ...getSelectProps(dicts.doctors, 'doctor'),
+      ...getSelectProps(doctors, 'doctor'),
     },
     {
-      title: "Діагноз",
+      title: "Основний діагноз",
       dataIndex: "diagnosis",
       key: "diagnosis",
       width: 240,
       sorter: true,
-      ...getSelectProps(dicts.diagnosis, 'diagnosis'),
+      ...getColumnSearchProps('diagnosis', "Основний діагноз"),
     },
     {
       title: "",
@@ -358,7 +352,7 @@ const PatientsList: React.FC = () => {
     {
       key: "usb",
       icon: <UsbOutlined />,
-      label: "Імпорт з USB",
+      label: "Імпорт з папки",
       onClick: async () => {
         await patientsApi.scanUsb();
         reloadPatients();
@@ -366,8 +360,37 @@ const PatientsList: React.FC = () => {
     },
   ];
 
-  const handleAdd = async (folderBase: string, date: string) => {
-    await patientsApi.makePatient(folderBase, date);
+  const handleAdd = async (folderBase: string, date: string, metadata: { doctor: string; diagnosis: string; patientCard?: string }) => {
+    // Extract name and birthdate from folderBase (format: surname_name_YYYY-MM-DD)
+    const parts = folderBase.split('_');
+    const surname = parts[0] || '';
+    const name = parts[1] || '';
+    const birthdate = parts[2] || '';
+    
+    const fullMetadata = {
+      name: `${surname} ${name}`.trim(),
+      birthdate,
+      doctor: metadata.doctor,
+      diagnosis: metadata.diagnosis,
+      patientCard: metadata.patientCard || ""
+    };
+    
+    await patientsApi.makePatient(folderBase, date, fullMetadata);
+    
+    // Copy patient card if selected
+    if (metadata.patientCard) {
+      try {
+        const configApi = await import('../../helpers/configApi');
+        const result = await configApi.copyPatientCardToPatient(metadata.patientCard, folderBase);
+        if (!result.success) {
+          console.error('Failed to copy patient card:', result.error);
+          // Note: We don't show an error to user as the patient was already created successfully
+        }
+      } catch (error) {
+        console.error('Failed to copy patient card:', error);
+      }
+    }
+    
     setAddOpen(false);
     reloadPatients();
   };

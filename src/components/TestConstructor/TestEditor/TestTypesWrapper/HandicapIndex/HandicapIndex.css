@@ -1,0 +1,248 @@
+/* HandicapIndex Component */
+.handicap-index-collapse {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Collapse Panel Header Styling */
+.handicap-index-collapse .ant-collapse-header {
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.handicap-index-collapse .ant-collapse-header:hover {
+  color: #1d4ed8;
+}
+
+/* Answer Options Info */
+.answer-options-info {
+  background: #f9f9f9;
+  padding: 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.add-button-container{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.answer-options-info h4 {
+  margin: 0 0 12px 0;
+  color: #262626;
+  font-weight: 600;
+}
+
+.answer-option {
+  background: #e6f7ff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #0050b3;
+  border: 1px solid #bae7ff;
+}
+
+/* Score Info */
+.score-info {
+  background: #f6ffed;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid #b7eb8f;
+  margin-bottom: 16px;
+}
+
+.score-info p {
+  margin: 0;
+  color: #389e0d;
+  font-size: 14px;
+}
+
+.score-calculation {
+  margin-left: 8px;
+  font-weight: normal;
+  color: #52c41a;
+}
+
+/* Answer Options Manager */
+.answer-options-manager {
+  padding: 0;
+}
+
+.answer-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.answer-option-item {
+  background: #fafafa;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  padding: 12px;
+  transition: all 0.2s ease;
+}
+
+.answer-option-item:hover {
+  border-color: #1d4ed8;
+  box-shadow: 0 2px 4px rgba(29, 78, 216, 0.1);
+}
+
+.option-inputs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.option-inputs .ant-input {
+  flex: 1;
+}
+
+.option-inputs .ant-input-number {
+  width: 100px;
+}
+
+.header-action-button {
+  margin-right: 8px;
+}
+
+/* Lists */
+.questions-list,
+.diagnosis-ranges-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Validation Error Banner */
+.validation-error-banner {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: #ff4d4f;
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+/* Panel Header with Add Buttons */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding-right: 8px;
+}
+
+.panel-title {
+  font-weight: 600;
+  color: inherit;
+}
+
+.header-add-button {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+
+/* Dark theme support */
+[data-theme="dark"] .handicap-index-collapse {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+[data-theme="dark"] .answer-options-info {
+  background: #262626;
+}
+
+[data-theme="dark"] .answer-options-info h4 {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .answer-option {
+  background: #003a8c;
+  color: #91d5ff;
+  border-color: #004bb5;
+}
+
+[data-theme="dark"] .score-info {
+  background: #162312;
+  border-color: #389e0d;
+}
+
+[data-theme="dark"] .score-info p {
+  color: #73d13d;
+}
+
+[data-theme="dark"] .score-calculation {
+  color: #95de64;
+}
+
+[data-theme="dark"] .add-button-container {
+  border-top-color: #434343;
+}
+
+[data-theme="dark"] .validation-error-banner {
+  background: #2a1215;
+  border-color: #ff7875;
+  color: #ff7875;
+}
+
+/* Answer Options Manager Dark Theme */
+[data-theme="dark"] .answer-option-item {
+  background: #262626;
+  border-color: #434343;
+}
+
+[data-theme="dark"] .answer-option-item:hover {
+  border-color: #1d4ed8;
+  box-shadow: 0 2px 4px rgba(29, 78, 216, 0.2);
+}
+
+/* Panel Header Dark Theme */
+[data-theme="dark"] .panel-title {
+  color: #ffffff;
+}
+
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .answer-options-info {
+    padding: 12px;
+  }
+  
+  .score-info {
+    padding: 12px;
+  }
+  
+  .panel-header {
+    gap: 8px;
+  }
+  
+  .header-add-button {
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel-header {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .header-add-button {
+    margin-left: auto;
+    min-width: auto;
+    padding: 4px 6px;
+  }
+  
+  .header-add-button .button-text {
+    display: none;
+  }
+}

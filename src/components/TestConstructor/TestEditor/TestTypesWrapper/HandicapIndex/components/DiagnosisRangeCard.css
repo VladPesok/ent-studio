@@ -1,0 +1,223 @@
+/* Diagnosis Range Card Styles */
+.diagnosis-range-card {
+  margin-bottom: 16px;
+}
+
+.diagnosis-range-card.invalid-range .diagnosis-range-collapse {
+  border-color: #ff4d4f;
+  background: #fff2f0;
+}
+
+.diagnosis-range-collapse {
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.diagnosis-range-collapse:hover {
+  border-color: #1890ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.15);
+}
+
+.diagnosis-range-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diagnosis-input,
+.score-input {
+  border-radius: 6px;
+  border: 1px solid #d9d9d9;
+  transition: all 0.3s ease;
+}
+
+.diagnosis-input:focus,
+.diagnosis-input:hover,
+.score-input:focus,
+.score-input:hover {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+/* Range Visualization */
+.range-visualization {
+  background: #f9f9f9;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.range-label {
+  font-size: 12px;
+  color: #8c8c8c;
+  margin-bottom: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.range-bar-container {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.range-bar-background {
+  height: 8px;
+  background: #e8e8e8;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.range-bar-fill {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #52c41a 0%, #73d13d 100%);
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  min-width: 2px;
+}
+
+.range-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 11px;
+  color: #8c8c8c;
+}
+
+.range-info {
+  text-align: center;
+  padding-top: 8px;
+  border-top: 1px solid #e8e8e8;
+}
+
+.range-text {
+  font-size: 14px;
+  color: #262626;
+  font-weight: 500;
+}
+
+/* Validation Error */
+.validation-error {
+  background: #fff2f0;
+  border: 1px solid #ffccc7;
+  border-radius: 4px;
+  padding: 8px 12px;
+  color: #ff4d4f;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Diagnosis Range Card Dark Theme */
+[data-theme="dark"] .diagnosis-range-collapse {
+  background: #1f1f1f;
+  border-color: #303030;
+}
+
+[data-theme="dark"] .diagnosis-range-collapse:hover {
+  border-color: #1890ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.25);
+}
+
+[data-theme="dark"] .diagnosis-range-card.invalid-range .diagnosis-range-collapse {
+  border-color: #ff7875;
+  background: #2a1215;
+}
+
+[data-theme="dark"] .field-label {
+  color: #a6a6a6;
+}
+
+[data-theme="dark"] .diagnosis-input,
+[data-theme="dark"] .score-input {
+  background: #262626;
+  border-color: #434343;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .diagnosis-input:focus,
+[data-theme="dark"] .diagnosis-input:hover,
+[data-theme="dark"] .score-input:focus,
+[data-theme="dark"] .score-input:hover {
+  border-color: #1890ff;
+  background: #1f1f1f;
+}
+
+[data-theme="dark"] .range-visualization {
+  background: #262626;
+  border-color: #434343;
+}
+
+[data-theme="dark"] .range-label {
+  color: #a6a6a6;
+}
+
+[data-theme="dark"] .range-bar-background {
+  background: #434343;
+}
+
+[data-theme="dark"] .range-labels {
+  color: #a6a6a6;
+}
+
+[data-theme="dark"] .range-info {
+  border-top-color: #434343;
+}
+
+[data-theme="dark"] .range-text {
+  color: #ffffff;
+}
+
+[data-theme="dark"] .validation-error {
+  background: #2a1215;
+  border-color: #ff7875;
+  color: #ff7875;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .diagnosis-range-content {
+    gap: 12px;
+  }
+  
+  .range-visualization {
+    padding: 12px;
+  }
+  
+  .range-text {
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .field-group {
+    gap: 2px;
+  }
+  
+  .range-visualization {
+    padding: 10px;
+  }
+  
+  .range-bar-background {
+    height: 6px;
+  }
+}

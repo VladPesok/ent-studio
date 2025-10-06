@@ -1,41 +1,38 @@
-import type { DictionaryType } from "../../electron/preload";
-const api = window.electronAPI;
-
-export type TabEntry = { name?: string; folder: string }; // "folder" is FS-safe id, name only for custom tabs
+export type TabEntry = { name?: string; folder: string };
+export type DictionaryType = "doctors" | "diagnosis";
 
 /* ---------- dictionaries ---------- */
-export const getDictionaries = async () => await api.getDictionaries();
+export const getDictionaries = async () => await window.ipcRenderer.invoke("dict:get");
 export const addDictionaryEntry = (entryName: DictionaryType, name: string) =>
-  api.addDictionaryEntry(entryName, name);
+  window.ipcRenderer.invoke("dict:add", entryName, name);
 
 /* ---------- settings ---------- */
-export const getSettings = () => api.getSettings();
+export const getSettings = () => window.ipcRenderer.invoke("settings:get");
 export const setSettings = (patch: Partial<{ theme:"light"|"dark"; locale:"en"|"ua"; praatPath?: string }>) =>
-  api.setSettings(patch);
+  window.ipcRenderer.invoke("settings:set", patch);
 
 /* ---------- session ---------- */
-export const getSession = () => api.getSession();
+export const getSession = () => window.ipcRenderer.invoke("session:get");
 export const setSession = (patch: Partial<{ currentDoctor: string|null }>) =>
-  api.setSession(patch);
-
-
+  window.ipcRenderer.invoke("session:set", patch);
 
 /* ---------- get / set shownTabs ---------- */
 export const getDefaultTabs = (): TabEntry[] => [
   { folder: "video" },
-  { folder: "audio" }
+  { folder: "audio" },
+  { folder: "tests" }
 ] as TabEntry[];
 
 export const getShownTabs = async (): Promise<TabEntry[]> => {
   try {
-    return await window.electronAPI.getShownTabs();
+    return await window.ipcRenderer.invoke("shownTabs:get");
   } catch {
     return getDefaultTabs();
   }
 };
 
 export const setShownTabs = async (tabs: TabEntry[]): Promise<void> => {
-  await window.electronAPI.setShownTabs(tabs.map(tab => ({
+  await window.ipcRenderer.invoke("shownTabs:set", tabs.map(tab => ({
     name: tab.name || tab.folder,
     folder: tab.folder
   })));
@@ -49,13 +46,47 @@ export const createFolderName = (name: string): string => {
     .replace(/^_|_$/g, '');
 };
 
-/* ---------- Praat integration ---------- */
 export const selectPraatExecutable = async (): Promise<string | null> => {
-  const result = await api.selectPraatExecutable();
+  const result = await window.ipcRenderer.invoke("praat:selectExecutable");
   return result.success ? result.path : null;
 };
 
 export const openFileWithPraat = async (praatPath: string, audioFilePath: string): Promise<boolean> => {
-  const result = await api.openFileWithPraat(praatPath, audioFilePath);
+  const result = await window.ipcRenderer.invoke("praat:openFile", praatPath, audioFilePath);
   return result.success;
+};
+
+export const getPatientCards = async () => {
+  return await window.ipcRenderer.invoke("patientCards:get");
+};
+
+export const importPatientCard = async (cardName: string, file: File): Promise<{ success: boolean; error?: string }> => {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await window.ipcRenderer.invoke("patientCards:import", cardName, arrayBuffer, file.name);
+    return result;
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+};
+
+
+export const getDefaultPatientCard = async (): Promise<string | null> => {
+  return await window.ipcRenderer.invoke("defaultPatientCard:get");
+};
+
+export const setDefaultPatientCard = async (fileName: string | null): Promise<void> => {
+  await window.ipcRenderer.invoke("defaultPatientCard:set", fileName);
+};
+
+export const copyPatientCardToPatient = async (cardFileName: string, patientFolderName: string): Promise<{ success: boolean; error?: string }> => {
+  return await window.ipcRenderer.invoke("patientCards:copyToPatient", cardFileName, patientFolderName);
+};
+
+export const openPatientCard = async (patientFolderName: string, cardFileName: string): Promise<{ success: boolean; error?: string | null; fallbackUsed?: boolean }> => {
+  return await window.ipcRenderer.invoke("patientCards:openPatientCard", patientFolderName, cardFileName);
+};
+
+export const deletePatientCard = async (cardFileName: string): Promise<{ success: boolean; error?: string }> => {
+  return await window.ipcRenderer.invoke("patientCards:delete", cardFileName);
 };

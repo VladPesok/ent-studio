@@ -5,6 +5,11 @@
   flex-direction: column;
 }
 
+.custom-tab-empty-wrap {
+  display: flex;
+  justify-content: center;
+}
+
 /* Header section */
 .custom-tab-header {
   display: flex;

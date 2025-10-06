@@ -15,7 +15,7 @@ let updateState = {
   isUpdateDownloaded: false
 }
 
-export function update(win: Electron.BrowserWindow) {
+export const setAutoUpdater = (win: Electron.BrowserWindow): void => {
 
   // When set to false, the update download will be triggered through the API
   autoUpdater.autoDownload = false

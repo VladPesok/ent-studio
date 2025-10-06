@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Layout,
@@ -9,7 +9,7 @@ import {
   Button,
   Tabs,
   List,
-  Space,
+  Select,
   Typography,
   Tooltip,
   message,
@@ -20,14 +20,17 @@ import {
   CalendarOutlined,
   FolderOpenOutlined,
   PlusOutlined,
+  ExperimentOutlined,
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 
 import VideoGallery from "./VideoGallery/VideoGallery";
 import AudioGallery from "./AudioGallery/AudioGallery";
 import CustomTab from "./CustomTab/CustomTab";
+import TestTab from "./TestTab/TestTab";
 import CreatableSelect from "../../common/input/CreatableSelect";
 import AddAppointmentModal from "./AddAppointmentModal/AddAppointmentModal";
+import { AppConfigContext } from "../../holders/AppConfig";
 
 import * as patientsApi from "../../helpers/patientsApi";
 import * as configApi from "../../helpers/configApi";
@@ -47,19 +50,26 @@ const fmt = (iso?: string) =>
 const PatientOverview: React.FC = () => {
   const { id: folder = "" } = useParams();
   const { t } = useTranslation();
+  const { doctors, diagnoses, addDoctor, addDiagnosis } = useContext(AppConfigContext);
 
   const { surname, name, dob } = useMemo(() => patientsApi.parsePatientFolder(folder), [folder]);
 
-  const [patientMeta, setPatientMeta] = useState<patientsApi.PatientMeta>({});
+  const [patientMeta, setPatientMeta] = useState<patientsApi.Patient>({
+    name: "",
+    birthdate: "",
+    latestAppointmentDate: "",
+    doctor: "",
+    diagnosis: "",
+    patientCard: "",
+    folder: "",
+    appointments: [],
+  });
+
   const [shownTabs, setShownTabs] = useState<configApi.TabEntry[]>(configApi.getDefaultTabs());
   const [currentAppointment, setCurrentAppointment] = useState<string>("");
   const [addAppointmentModalVisible, setAddAppointmentModalVisible] = useState(false);
   const [patientInfoLoading, setPatientInfoLoading] = useState(true);
   const [currentAppointmentLoading, setCurrentAppointmentLoading] = useState(false);
-  
-  const [dicts, setDicts] = useState<{ doctors: string[]; diagnosis: string[] }>(
-    { doctors: [], diagnosis: [] },
-  );
   const [form, setForm] = useState({
     doctor: "",
     diagnosis: "",
@@ -67,7 +77,7 @@ const PatientOverview: React.FC = () => {
     voiceReport: [] as any[],
   });
   const [currentAppointmentForm, setCurrentAppointmentForm] = useState({
-    doctor: "",
+    doctors: [],
     diagnosis: "",
     notes: "",
   });
@@ -76,26 +86,22 @@ const PatientOverview: React.FC = () => {
     const loadData = async () => {
       setPatientInfoLoading(true);
       try {
-        const [dictionaries, patientMeta, tabs] = await Promise.all([
-          configApi.getDictionaries(),
+        const [patientMeta, tabs] = await Promise.all([
           patientsApi.getPatientMeta(folder),
           configApi.getShownTabs(),
         ]);
         
-        setDicts(dictionaries);
         setPatientMeta(patientMeta);
         setShownTabs(Array.isArray(tabs) ? tabs : configApi.getDefaultTabs());
         
-        // Set currentAppointment as inner variable (not saved to config)
         const selectedAppointment = patientMeta.appointments?.[0]?.date || "";
         setCurrentAppointment(selectedAppointment);
         
-        // Load patient-level data (only doctor and diagnosis)
         const loaded = {
           doctor:      patientMeta?.doctor     ?? "",
           diagnosis:   patientMeta?.diagnosis  ?? "",
-          notes:       "", // notes are appointment-level, not patient-level
-          voiceReport: [], // voiceReport is appointment-level, not patient-level
+          notes:       "",
+          voiceReport: [],
         };
         setForm(loaded);
         
@@ -123,47 +129,38 @@ const PatientOverview: React.FC = () => {
     const newForm = { ...form, ...patch };
     setForm(newForm);
     
-    // Auto-save only doctor and diagnosis to patient.config (patient-level)
     try {
       const patientConfigData: { doctor?: string; diagnosis?: string } = {};
       
       if ('doctor' in patch) patientConfigData.doctor = newForm.doctor;
       if ('diagnosis' in patch) patientConfigData.diagnosis = newForm.diagnosis;
       
-      // Only save if we have patient-level data to save
       if (Object.keys(patientConfigData).length > 0) {
         await patientsApi.setPatient(folder, patientConfigData);
       }
-
-      // Add new entries to dictionaries if needed
-      if (newForm.doctor && !dicts.doctors.includes(newForm.doctor))
-        await configApi.addDictionaryEntry("doctors", newForm.doctor);
-
-      if (newForm.diagnosis && !dicts.diagnosis.includes(newForm.diagnosis))
-        await configApi.addDictionaryEntry("diagnosis", newForm.diagnosis);
     } catch (error) {
       console.error('Failed to auto-save patient data:', error);
     }
   };
 
-
-
   const handleAppointmentChange = async (appointmentDate: string) => {
+    if (currentAppointment === appointmentDate) {
+      return;
+    }
+    
     setCurrentAppointment(appointmentDate);
     setCurrentAppointmentLoading(true);
     
-    // Load appointment-specific data from appointment.config
     try {
-      const appointmentData = await window.electronAPI.getPatientAppointment(`${folder}/${appointmentDate}`);
+      const appointmentData = await patientsApi.getPatientAppointment(`${folder}/${appointmentDate}`);
       setCurrentAppointmentForm({
-        doctor: appointmentData.doctor || "",
+        doctors: appointmentData.doctors || [],
         diagnosis: appointmentData.diagnosis || "",
         notes: appointmentData.notes || "",
       });
     } catch (error) {
-      // If appointment data doesn't exist, use defaults
       setCurrentAppointmentForm({
-        doctor: "",
+        doctors: [],
         diagnosis: "",
         notes: "",
       });
@@ -174,19 +171,25 @@ const PatientOverview: React.FC = () => {
 
   const handleCreateAppointment = async (appointmentData: {
     date: string;
-    doctor: string;
+    doctors: string[];
     diagnosis: string;
     notes: string;
   }) => {
     try {
       setPatientInfoLoading(true);
       
-      // Create the appointment folder
-      await window.electronAPI.makePatient(folder, appointmentData.date);
+      // Create appointment structure with patient metadata
+      const metadata = {
+        name: patientMeta.name,
+        birthdate: patientMeta.birthdate,
+        doctor: appointmentData.doctors[0] || patientMeta.doctor,
+        diagnosis: appointmentData.diagnosis
+      };
       
-      // Save appointment-specific data
+      await patientsApi.makePatient(folder, appointmentData.date, metadata);
+      
       await patientsApi.setPatientAppointments(`${folder}/${appointmentData.date}`, {
-        doctor: appointmentData.doctor,
+        doctors: appointmentData.doctors,
         diagnosis: appointmentData.diagnosis,
         notes: appointmentData.notes,
       });
@@ -212,16 +215,37 @@ const PatientOverview: React.FC = () => {
 
   const handleOpenPatientFolder = async () => {
     try {
-      await window.electronAPI.openPatientFolderInFs(folder);
+      await patientsApi.openPatientFolderInFs(folder);
     } catch (error) {
       console.error('Failed to open patient folder:', error);
+    }
+  };
+
+  const handleOpenPatientCard = async () => {
+    if (!patientMeta.patientCard) {
+      message.error('Картка пацієнта не знайдена');
+      return;
+    }
+
+    try {
+      const result = await configApi.openPatientCard(folder, patientMeta.patientCard);
+      if (!result.success) {
+        if (result.fallbackUsed) {
+          message.warning('Не вдалося відкрити файл, відкрито папку пацієнта');
+        } else {
+          message.error(result.error || 'Не вдалося відкрити картку пацієнта');
+        }
+      }
+    } catch (error) {
+      console.error('Failed to open patient card:', error);
+      message.error('Не вдалося відкрити картку пацієнта');
     }
   };
 
   const handleOpenAppointmentFolder = async () => {
     if (currentAppointment) {
       try {
-        await window.electronAPI.openPatientFolderInFs(`${folder}/${currentAppointment}`);
+        await patientsApi.openPatientFolderInFs(`${folder}/${currentAppointment}`);
       } catch (error) {
         console.error('Failed to open appointment folder:', error);
       }
@@ -230,10 +254,7 @@ const PatientOverview: React.FC = () => {
 
   const handleDoctorCreate = async (newDoctor: string) => {
     try {
-      await window.electronAPI.addDictionaryEntry('doctors', newDoctor);
-      // Refresh dictionaries
-      const newDicts = await window.electronAPI.getDictionaries();
-      setDicts(newDicts);
+      await addDoctor(newDoctor);
     } catch (error) {
       console.error('Failed to add doctor:', error);
     }
@@ -241,10 +262,7 @@ const PatientOverview: React.FC = () => {
 
   const handleDiagnosisCreate = async (newDiagnosis: string) => {
     try {
-      await window.electronAPI.addDictionaryEntry('diagnosis', newDiagnosis);
-      // Refresh dictionaries
-      const newDicts = await window.electronAPI.getDictionaries();
-      setDicts(newDicts);
+      await addDiagnosis(newDiagnosis);
     } catch (error) {
       console.error('Failed to add diagnosis:', error);
     }
@@ -257,9 +275,9 @@ const PatientOverview: React.FC = () => {
     // Auto-save doctor, diagnosis, and notes to appointment.config (appointment-level)
     if (currentAppointment) {
       try {
-        const appointmentConfigData: { doctor?: string; diagnosis?: string; notes?: string } = {};
+        const appointmentConfigData: { doctors?: string[]; diagnosis?: string; notes?: string } = {};
         
-        if ('doctor' in patch) appointmentConfigData.doctor = newForm.doctor;
+        if ('doctors' in patch) appointmentConfigData.doctors = newForm.doctors;
         if ('diagnosis' in patch) appointmentConfigData.diagnosis = newForm.diagnosis;
         if ('notes' in patch) appointmentConfigData.notes = newForm.notes;
         
@@ -299,6 +317,16 @@ const PatientOverview: React.FC = () => {
             ),
             children: <AudioGallery baseFolder={folder} currentAppointment={currentAppointment} />,
           };
+        } else if (tab.folder === 'tests') {
+          return {
+            key,
+            label: (
+              <>
+                <ExperimentOutlined /> {t(tab.folder)}
+              </>
+            ),
+            children: <TestTab baseFolder={folder} currentAppointment={currentAppointment} />,
+          };
         } else {
           // Custom tab
           return {
@@ -333,6 +361,16 @@ const PatientOverview: React.FC = () => {
           ),
           children: <AudioGallery baseFolder={folder} currentAppointment={currentAppointment} />,
         };
+      } else if (tab.folder === 'tests') {
+        return {
+          key,
+          label: (
+            <>
+              <ExperimentOutlined /> {t(tab.folder)}
+            </>
+          ),
+          children: <TestTab baseFolder={folder} currentAppointment={currentAppointment} />,
+        };
       } else {
         // Custom tab
         return {
@@ -352,15 +390,23 @@ const PatientOverview: React.FC = () => {
           theme="light"
           style={{ background: "transparent", paddingRight: 24 }}
         >
-          {/* First Card: Patient Info */}
           <Card
             loading={patientInfoLoading}
             title={
               <>
                 <div style={{ marginTop: 8 }}>
-                  <Title level={3} style={{ margin: 0 }}>
-                    {surname} {name}
-                  </Title>
+                  <Tooltip title={patientMeta.patientCard ? "Відкрити картку пацієнта" : ""}>
+                    <Title 
+                      level={3} 
+                      style={{ 
+                        margin: 0, 
+                        cursor: patientMeta.patientCard ? 'pointer' : 'default' 
+                      }}
+                      onClick={patientMeta.patientCard ? handleOpenPatientCard : undefined}
+                    >
+                      {surname} {name}
+                    </Title>
+                  </Tooltip>
                 </div>
                 
                 <Descriptions column={1} size="small" style={{ marginBottom: 8 }}>
@@ -381,10 +427,10 @@ const PatientOverview: React.FC = () => {
             }
           >
             <Form layout="vertical">
-              <Form.Item label="Основний лікар">
+              <Form.Item label="Ведучий лікар">
                 <CreatableSelect
                   value={form.doctor || null}
-                  items={Array.isArray(dicts.doctors) ? dicts.doctors : []}
+                  items={Array.isArray(doctors) ? doctors : []}
                   onChange={(val) => updateField({ doctor: val || "" })}
                   onCreate={handleDoctorCreate}
                   placeholder="Обрати або додати лікаря..."
@@ -395,7 +441,7 @@ const PatientOverview: React.FC = () => {
               <Form.Item label="Основний діагноз">
                 <CreatableSelect
                   value={form.diagnosis || null}
-                  items={Array.isArray(dicts.diagnosis) ? dicts.diagnosis : []}
+                  items={Array.isArray(diagnoses) ? diagnoses : []}
                   onChange={(val) => updateField({ diagnosis: val || "" })}
                   onCreate={handleDiagnosisCreate}
                   placeholder="Обрати або додати діагноз..."
@@ -411,7 +457,6 @@ const PatientOverview: React.FC = () => {
                 Список прийомів
               </div>
               
-              {/* Create New Appointment Button */}
               <Button
                 type="dashed"
                 icon={<PlusOutlined />}
@@ -447,7 +492,6 @@ const PatientOverview: React.FC = () => {
 
           </Card>
 
-          {/* Second Card: Current Appointment Details */}
           {currentAppointment && (
             <Card
               loading={currentAppointmentLoading}
@@ -464,21 +508,28 @@ const PatientOverview: React.FC = () => {
               }
             >
               <Form layout="vertical">
-                <Form.Item label="Лікар на прийомі">
-                  <CreatableSelect
-                    value={currentAppointmentForm.doctor || null}
-                    items={Array.isArray(dicts.doctors) ? dicts.doctors : []}
-                    onChange={(val) => updateAppointmentField({ doctor: val || "" })}
-                    onCreate={handleDoctorCreate}
+                <Form.Item label="Лікарі на прийомі">
+                  <Select
+                    mode="tags"
+                    value={currentAppointmentForm.doctors || []}
+                    options={Array.isArray(doctors) ? doctors.map(doctor => ({ value: doctor, label: doctor })) : []}
+                    onChange={async (val) => {
+                      // Handle new doctor creation
+                      const newDoctors = val.filter(doctor => !doctors.includes(doctor));
+                      for (const newDoctor of newDoctors) {
+                        await handleDoctorCreate(newDoctor);
+                      }
+                      updateAppointmentField({ doctors: val || [] });
+                    }}
                     placeholder="Обрати або додати лікаря..."
                     style={{ width: '100%' }}
                   />
                 </Form.Item>
 
-                <Form.Item label="Поточний діагноз">
+                <Form.Item label="Діагноз станом на дату прийому">
                   <CreatableSelect
                     value={currentAppointmentForm.diagnosis || null}
-                    items={Array.isArray(dicts.diagnosis) ? dicts.diagnosis : []}
+                    items={Array.isArray(diagnoses) ? diagnoses : []}
                     onChange={(val) => updateAppointmentField({ diagnosis: val || "" })}
                     onCreate={handleDiagnosisCreate}
                     placeholder="Обрати або додати діагноз..."
@@ -514,7 +565,6 @@ const PatientOverview: React.FC = () => {
         </Content>
       </Layout>
       
-      {/* Add Appointment Modal */}
       <AddAppointmentModal
         visible={addAppointmentModalVisible}
         onCancel={() => setAddAppointmentModalVisible(false)}
@@ -522,8 +572,6 @@ const PatientOverview: React.FC = () => {
         existingDates={(patientMeta.appointments || []).map(appt => appt.date)}
         defaultDoctor={patientMeta.doctor || ''}
         defaultDiagnosis={patientMeta.diagnosis || ''}
-        doctors={dicts.doctors}
-        diagnoses={dicts.diagnosis}
       />
     </Layout>
   );

@@ -5,6 +5,11 @@
   height: 100%;
 }
 
+.audio-gallery-empty-wrap{
+  display: flex;
+  justify-content: center;
+}
+
 /* Header */
 .audio-gallery-header {
   display: flex;
@@ -33,9 +38,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
+  height: 300px;
   text-align: center;
-  flex: 1;
 }
 
 .loading-spinner {
@@ -101,6 +105,13 @@
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
+}
+
+.file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .play-pause-btn {
@@ -185,7 +196,12 @@
 }
 
 .file-ext::before {
-  content: "🎵";
+  content: "📄";
+  margin-right: 4px;
+}
+
+.file-type::before {
+  content: "🏷️";
   margin-right: 4px;
 }
 

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import {
-  BrowserRouter,
   HashRouter,
   Routes,
   Route,
@@ -13,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import PatientsList    from "./components/PatientsList/PatientsList";
 import PatientOverview from "./components/PatientOverview/PatientOverview";
 import Settings        from "./components/Settings/Settings";
+import TestConstructor from "./components/TestConstructor/TestConstructor";
 
 import { AppConfigProvider, AppConfigContext } from "./holders/AppConfig";
 import AppHeader from "./wrappers/Header/Header";
@@ -45,7 +45,7 @@ const AppShell: React.FC = () => {
         token: { colorPrimary: "#2563eb" },
       }}
     >
-      <Layout style={{ minHeight: "100vh" }}>
+      <Layout className="app-container">
         <AppSider collapsed={collapsed} />
         <Layout>
           <AppHeader
@@ -53,13 +53,14 @@ const AppShell: React.FC = () => {
             onToggle={() => setCollapsed(!collapsed)}
             token={token}
           />
-          <Content>
+          <Content className="app-content">
             <Routes>
               <Route
                 path="/patients"
                 element={<PatientsList/>}
               />
               <Route path="/patients/:id" element={<PatientOverview />} />
+              <Route path="/tests"         element={<TestConstructor />} />
               <Route path="/settings"      element={<Settings />} />
               <Route
                 path="*"

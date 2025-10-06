@@ -3,6 +3,7 @@ import { Button, Space } from "antd";
 import { PlusOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import "./VideoGallery.css";
 import { detectAudioInfo } from "./helpers/detectAudio";
+import * as patientsApi from "../../../helpers/patientsApi";
 
 interface VideoClip {
   url: string;
@@ -117,7 +118,7 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
       const currentOffset = reset ? 0 : offset;
 
       // Fetch page from backend
-      const res = await window.electronAPI.getClipsDetailed(
+      const res = await patientsApi.getClipsDetailed(
         baseFolder,
         currentOffset,
         ITEMS_PER_PAGE
@@ -182,7 +183,7 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
 
   const handleLoadMoreVideos = async () => {
     try {
-      const result = await window.electronAPI.loadMoreVideos(baseFolder);
+      const result = await patientsApi.loadMoreVideos(baseFolder);
       if (result.success && result.count > 0) {
         loadClips(true);
       }
@@ -194,10 +195,10 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
   const handleOpenVideoFolder = async () => {
     try {
       if (currentAppointment) {
-        await window.electronAPI.openPatientFolderInFs(`${baseFolder}/${currentAppointment}/video`);
+        await patientsApi.openPatientFolderInFs(`${baseFolder}/${currentAppointment}/video`);
       } else {
         // Fallback to base folder if no current appointment
-        await window.electronAPI.openPatientFolderInFs(baseFolder);
+        await patientsApi.openPatientFolderInFs(baseFolder);
       }
     } catch (error) {
       console.error("Failed to open video folder:", error);
@@ -217,7 +218,7 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
 
   if (!loading && clips.length === 0) {
     return (
-      <div className="gallery-wrap">
+      <div className="gallery-empty-wrap">
         <div className="empty-state">
           <div className="empty-icon">🎬</div>
           <h3>Немає відео файлів</h3>

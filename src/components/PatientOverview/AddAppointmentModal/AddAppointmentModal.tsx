@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { Modal, Form, DatePicker, Input, Row, Col, Divider, Typography } from 'antd';
+import React, { useState, useEffect, useContext } from 'react';
+import { Modal, Form, DatePicker, Input, Row, Col, Divider, Typography, Select } from 'antd';
 import { CalendarOutlined, MedicineBoxOutlined, FileTextOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/uk';
 import CreatableSelect from '../../../common/input/CreatableSelect';
-import * as configApi from '../../../helpers/configApi';
+import { AppConfigContext } from '../../../holders/AppConfig';
 import './AddAppointmentModal.css';
 
 dayjs.locale('uk');
@@ -16,15 +16,13 @@ interface AddAppointmentModalProps {
   onCancel: () => void;
   onSubmit: (data: {
     date: string;
-    doctor: string;
+    doctors: string[];
     diagnosis: string;
     notes: string;
   }) => void;
   existingDates: string[];
   defaultDoctor: string;
   defaultDiagnosis: string;
-  doctors: string[];
-  diagnoses: string[];
 }
 
 const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
@@ -34,9 +32,8 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
   existingDates,
   defaultDoctor,
   defaultDiagnosis,
-  doctors,
-  diagnoses,
 }) => {
+  const { doctors, diagnoses, addDoctor, addDiagnosis } = useContext(AppConfigContext);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
@@ -46,11 +43,10 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
 
   useEffect(() => {
     if (visible) {
-      // Set default values when modal opens
       form.setFieldsValue({
         date: isTodayTaken ? null : dayjs(),
-        doctor: defaultDoctor || undefined,
-        diagnosis: defaultDiagnosis || undefined,
+        doctors: defaultDoctor ? [defaultDoctor] : [],
+        diagnosis: defaultDiagnosis || null,
         notes: '',
       });
     } else {
@@ -62,7 +58,7 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
 
   const handleDoctorCreate = async (value: string) => {
     try {
-      await configApi.addDictionaryEntry('doctors', value);
+      await addDoctor(value);
     } catch (error) {
       console.error("Failed to add doctor:", error);
     }
@@ -70,7 +66,7 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
 
   const handleDiagnosisCreate = async (value: string) => {
     try {
-      await configApi.addDictionaryEntry('diagnosis', value);
+      await addDiagnosis(value);
     } catch (error) {
       console.error("Failed to add diagnosis:", error);
     }
@@ -83,8 +79,8 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
       
       onSubmit({
         date: values.date.format('YYYY-MM-DD'),
-        doctor: values.doctor || '',
-        diagnosis: values.diagnosis || '',
+        doctors: values.doctors,
+        diagnosis: values.diagnosis,
         notes: values.notes || '',
       });
     } catch (error) {
@@ -169,14 +165,22 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
-                  label="Лікар"
-                  name="doctor"
+                  label="Лікарі на прийомі"
+                  name="doctors"
                 >
-                  <CreatableSelect
-                    value={form.getFieldValue('doctor')}
-                    onChange={(value) => form.setFieldsValue({ doctor: value })}
-                    items={Array.isArray(doctors) ? doctors : []}
-                    onCreate={handleDoctorCreate}
+                  <Select
+                    mode="tags"
+                    value={form.getFieldValue('doctors')}
+                    onChange={(value) => {
+                      form.setFieldsValue({ doctors: value });
+                      if (Array.isArray(value)) {
+                        const newDoctors = value.filter(v => !doctors.includes(v));
+                        if (newDoctors.length > 0) {
+                          newDoctors.forEach(handleDoctorCreate);
+                        }
+                      }
+                    }}
+                    options={doctors.map(doctor => ({ label: doctor, value: doctor }))}
                     placeholder="Оберіть або введіть лікаря"
                     style={{ width: '100%' }}
                   />
@@ -185,13 +189,13 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
               
               <Col span={12}>
                 <Form.Item
-                  label="Діагноз"
+                  label="Діагноз станом на дату прийому"
                   name="diagnosis"
                 >
-                  <CreatableSelect
+                 <CreatableSelect
                     value={form.getFieldValue('diagnosis')}
                     onChange={(value) => form.setFieldsValue({ diagnosis: value })}
-                    items={Array.isArray(diagnoses) ? diagnoses : []}
+                    items={diagnoses}
                     onCreate={handleDiagnosisCreate}
                     placeholder="Оберіть або введіть діагноз"
                     style={{ width: '100%' }}
