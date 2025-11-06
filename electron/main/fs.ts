@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import path, { extname } from "path";
 
-import { app, ipcMain, dialog } from 'electron'
+import { app, ipcMain, dialog, BrowserWindow } from 'electron'
 import type { App, Dialog, IpcMain } from "electron";
 
 import { shell } from "electron";
@@ -158,7 +158,7 @@ const latestAppointmentDir = async (patientsRoot: string, folder: string) => {
   return path.join(patientsRoot, folder, dates);
 };
 
-export const setFsOperations = async (): Promise<void> => {
+export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> => {
   const appDataFolder = path.join(app.getPath("userData"), "appData");
 
   const patientsRoot = path.join(appDataFolder, "patients");
@@ -186,9 +186,30 @@ export const setFsOperations = async (): Promise<void> => {
     const defaultPatientCard = cfg.settings.defaultPatientCard;
 
     const entries = await fs.readdir(usb, { withFileTypes: true });
-    for (const e of entries)
-      if (e.isDirectory() && USB_PATTERN.test(e.name))
-        await copySession(patientsRoot, path.join(usb, e.name), e.name, defaultPatientCard);
+    
+    // Filter folders that match the USB pattern
+    const validFolders = entries.filter(e => e.isDirectory() && USB_PATTERN.test(e.name));
+    const totalFolders = validFolders.length;
+    
+    if (totalFolders === 0) {
+      return buildProjects(patientsRoot);
+    }
+    
+    // Process folders with progress updates
+    for (let i = 0; i < validFolders.length; i++) {
+      const e = validFolders[i];
+      const progress = Math.round(((i + 1) / totalFolders) * 100);
+      
+      // Send progress update to renderer
+      mainWindow.webContents.send('import-progress', {
+        current: i + 1,
+        total: totalFolders,
+        progress,
+        folderName: e.name
+      });
+      
+      await copySession(patientsRoot, path.join(usb, e.name), e.name, defaultPatientCard);
+    }
 
     return buildProjects(patientsRoot);
   });

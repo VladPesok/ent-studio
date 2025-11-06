@@ -50,7 +50,7 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
   const [patientCards, setPatientCards]   = useState<PatientCard[]>([]);
   const [defaultPatientCard, setDefaultPatientCardState] = useState<string | null>(null);
 
-  const [loaded, setLoaded]               = useState(false);      // ← flag
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     (async () => {

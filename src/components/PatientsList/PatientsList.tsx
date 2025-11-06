@@ -1,12 +1,13 @@
 import React, { useMemo, useState, useEffect, useContext } from "react";
-import { Table, Input, Button, Dropdown, theme as antTheme, MenuProps, DatePicker, Select, Space, Tag, Row, Col, Pagination } from "antd";
+import { Table, Input, Button, Dropdown, theme as antTheme, MenuProps, DatePicker, Select, Space, Tag, Row, Col, Pagination, Modal, Progress, message } from "antd";
 import {
   EllipsisOutlined,
   PlusOutlined,
   UsbOutlined,
   FolderOpenOutlined,
   SearchOutlined,
-  ClearOutlined
+  ClearOutlined,
+  LoadingOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import AddCardModal from "./AddCardModal/AddCardModal";
@@ -22,11 +23,20 @@ const { useToken } = antTheme;
 
 
 
+interface ImportProgress {
+  current: number;
+  total: number;
+  progress: number;
+  folderName: string;
+}
+
 const PatientsList: React.FC = () => {
   const { doctors, diagnoses } = useContext(AppConfigContext);
   const [patients, setPatients] = useState<patientsApi.Patient[]>([]);
 
   const [addOpen, setAddOpen] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportProgress>({ current: 0, total: 0, progress: 0, folderName: '' });
   const [tableState, setTableState] = useState<patientsApi.TableState>({
     pagination: { current: 1, pageSize: 10, total: 0 },
     filters: {},
@@ -214,6 +224,19 @@ const PatientsList: React.FC = () => {
     reloadPatients();
   }, []);
 
+  // Listen for import progress events
+  useEffect(() => {
+    const handleImportProgress = (_event: any, progressData: ImportProgress) => {
+      setImportProgress(progressData);
+    };
+
+    window.ipcRenderer.on('import-progress', handleImportProgress);
+
+    return () => {
+      window.ipcRenderer.off('import-progress', handleImportProgress);
+    };
+  }, []);
+
   const handleSearchChange = async (value: string) => {
     await updateTableState({ 
       search: value || '', 
@@ -348,15 +371,35 @@ const PatientsList: React.FC = () => {
     },
   ];
 
+  const handleUsbImport = async () => {
+    try {
+      setImportLoading(true);
+      setImportProgress({ current: 0, total: 0, progress: 0, folderName: '' });
+      
+      const result = await patientsApi.scanUsb();
+      
+      if (result && result.length > 0) {
+        message.success(`Успішно імпортовано матеріали`);
+      } else {
+        message.info('Не знайдено нових даних для імпорту');
+      }
+      
+      await reloadPatients();
+    } catch (error) {
+      console.error('Import error:', error);
+      message.error('Помилка при імпорті даних');
+    } finally {
+      setImportLoading(false);
+      setImportProgress({ current: 0, total: 0, progress: 0, folderName: '' });
+    }
+  };
+
   const items: MenuProps["items"] = [
     {
       key: "usb",
       icon: <UsbOutlined />,
       label: "Імпорт з папки",
-      onClick: async () => {
-        await patientsApi.scanUsb();
-        reloadPatients();
-      },
+      onClick: handleUsbImport,
     },
   ];
 
@@ -400,6 +443,51 @@ const PatientsList: React.FC = () => {
       {addOpen && (
         <AddCardModal onClose={() => setAddOpen(false)} onOk={handleAdd} />
       )}
+
+      <Modal
+        open={importLoading}
+        closable={false}
+        footer={null}
+        centered
+        width={450}
+      >
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <LoadingOutlined style={{ fontSize: 48, color: token.colorPrimary, marginBottom: 20 }} />
+          <h3 style={{ marginBottom: 16 }}>Імпорт даних</h3>
+          
+          {importProgress.total > 0 ? (
+            <>
+              <Progress 
+                percent={importProgress.progress} 
+                status="active"
+                strokeColor={{
+                  '0%': '#108ee9',
+                  '100%': '#87d068',
+                }}
+              />
+              <p style={{ marginTop: 12, color: '#666', fontSize: '14px' }}>
+                Обробка папки {importProgress.current} з {importProgress.total}
+              </p>
+              {importProgress.folderName && (
+                <p style={{ marginTop: 8, fontSize: '12px', color: '#999', wordBreak: 'break-all' }}>
+                  {importProgress.folderName}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <Progress percent={100} status="active" showInfo={false} />
+              <p style={{ marginTop: 16, color: '#666' }}>
+                Підготовка до імпорту...
+              </p>
+            </>
+          )}
+          
+          <p style={{ marginTop: 12, fontSize: '12px', color: '#999' }}>
+            Це може зайняти деякий час для великих файлів
+          </p>
+        </div>
+      </Modal>
 
       <div className="project-view">
         <div style={{

@@ -77,7 +77,7 @@ async function createWindow() {
   })
 
   setAutoUpdater(win);
-  await setFsOperations();
+  await setFsOperations(win);
 }
 
 app.whenReady().then(() => {
