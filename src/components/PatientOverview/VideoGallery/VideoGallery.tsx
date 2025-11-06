@@ -121,7 +121,8 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
       const res = await patientsApi.getClipsDetailed(
         baseFolder,
         currentOffset,
-        ITEMS_PER_PAGE
+        ITEMS_PER_PAGE,
+        currentAppointment
       );
 
       if (!isMountedRef.current || loadToken !== loadTokenRef.current) return;
@@ -171,11 +172,11 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
       setLoading(false);
       setLoadingMore(false);
     }
-  }, [baseFolder, offset]);
+  }, [baseFolder, currentAppointment, offset]);
 
   useEffect(() => {
     loadClips(true);
-  }, [baseFolder]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [baseFolder, currentAppointment]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLoadMore = () => {
     if (!loadingMore && hasMore) loadClips(false);
@@ -183,7 +184,7 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
 
   const handleLoadMoreVideos = async () => {
     try {
-      const result = await patientsApi.loadMoreVideos(baseFolder);
+      const result = await patientsApi.loadMoreVideos(baseFolder, currentAppointment);
       if (result.success && result.count > 0) {
         loadClips(true);
       }

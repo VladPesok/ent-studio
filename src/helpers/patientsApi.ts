@@ -261,10 +261,10 @@ export const saveRecordedAudio = (baseFolder: string, currentAppointment: string
   window.ipcRenderer.invoke("patient:saveRecordedAudio", baseFolder, currentAppointment, arrayBuffer, filename);
 
 // Video-related functions
-export const getClipsDetailed = (baseFolder: string, offset: number, limit: number) => 
-  window.ipcRenderer.invoke("patient:clipsDetailed", baseFolder, offset, limit);
-export const loadMoreVideos = (baseFolder: string) => 
-  window.ipcRenderer.invoke("patient:loadMoreVideos", baseFolder);
+export const getClipsDetailed = (baseFolder: string, offset: number, limit: number, currentAppointment?: string) => 
+  window.ipcRenderer.invoke("patient:clipsDetailed", baseFolder, offset, limit, currentAppointment);
+export const loadMoreVideos = (baseFolder: string, currentAppointment?: string) => 
+  window.ipcRenderer.invoke("patient:loadMoreVideos", baseFolder, currentAppointment);
 
 // Custom tab functions
 export const getCustomTabFiles = (baseFolder: string, tabName: string, currentAppointment?: string) => 
