@@ -375,9 +375,16 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
   });
 
   // Enhanced clips with pagination and audio detection
-  ipcMain.handle("patient:clipsDetailed", async (_e, folder: string, offset: number = 0, limit: number = 12) => {
-    const apptDir = await latestAppointmentDir(patientsRoot, folder);
-    const videoDir = path.join(apptDir, "video");
+  ipcMain.handle("patient:clipsDetailed", async (_e, folder: string, offset: number = 0, limit: number = 12, currentAppointment?: string) => {
+    let videoDir: string;
+    
+    if (currentAppointment) {
+      videoDir = path.join(patientsRoot, folder, currentAppointment, "video");
+    } else {
+      const apptDir = await latestAppointmentDir(patientsRoot, folder);
+      videoDir = path.join(apptDir, "video");
+    }
+    
     const allClips = await listDirClips(videoDir);
     
     const paginatedClips = allClips.slice(offset, offset + limit);
@@ -411,7 +418,7 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
   });
 
   // Load more videos from external sources
-  ipcMain.handle("patient:loadMoreVideos", async (_e, folder: string) => {
+  ipcMain.handle("patient:loadMoreVideos", async (_e, folder: string, currentAppointment?: string) => {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ["openFile", "multiSelections"],
       filters: [
@@ -422,8 +429,15 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
     
     if (canceled || !filePaths.length) return { success: false, count: 0 };
     
-    const apptDir = await latestAppointmentDir(patientsRoot, folder);
-    const videoDir = path.join(apptDir, "video");
+    let videoDir: string;
+    
+    if (currentAppointment) {
+      videoDir = path.join(patientsRoot, folder, currentAppointment, "video");
+    } else {
+      const apptDir = await latestAppointmentDir(patientsRoot, folder);
+      videoDir = path.join(apptDir, "video");
+    }
+    
     await ensureDir(videoDir);
     
     let copiedCount = 0;
