@@ -6,6 +6,9 @@ import os from 'node:os'
 
 import { setAutoUpdater } from './autoUpdater'
 import { setFsOperations } from "./fs"
+import { initializeDatabase, closeDatabase } from '../../database/connection'
+import { runMigrations } from '../../database/migrate'
+import { needsMigration, createBackup, runMigration } from '../../database/oldConfigMigration'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -53,6 +56,44 @@ async function createWindow() {
     },
   })
 
+  // Initialize database before loading content
+  try {
+    console.log('Initializing database...');
+    initializeDatabase();
+    
+    await runMigrations();
+    
+    // Check if old config file migration is needed
+    if (await needsMigration()) {
+      console.log('Old config migration needed, creating backup...');
+      const backupPath = await createBackup();
+      console.log(`Backup created at: ${backupPath}`);
+      
+      console.log('Running old config migration...');
+      const result = await runMigration((progress) => {
+        win?.webContents.send('migration-progress', progress);
+      });
+      
+      if (result.success) {
+        console.log('Config migration completed successfully:', result.stats);
+      } else {
+        console.error('Config migration failed:', result.message, result.errors);
+        dialog.showErrorBox(
+          'Migration Failed',
+          `Failed to migrate data: ${result.message}\n\nBackup location: ${backupPath}\n\nPlease contact support.`
+        );
+      }
+    } else {
+      console.log('No old config migration needed');
+    }
+  } catch (error) {
+    console.error('Database initialization error:', error);
+    dialog.showErrorBox(
+      'Database Error',
+      `Failed to initialize database: ${error instanceof Error ? error.message : 'Unknown error'}\n\nThe application may not work correctly.`
+    );
+  }
+
   if (VITE_DEV_SERVER_URL) { // #298
     win.loadURL(VITE_DEV_SERVER_URL)
     win.webContents.openDevTools()
@@ -87,6 +128,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   win = null
+  closeDatabase(); // Close database connection
   if (process.platform !== 'darwin') app.quit()
 })
 

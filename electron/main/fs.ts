@@ -8,17 +8,28 @@ import { shell } from "electron";
 import { spawn, execFile  } from "child_process";
 
 import {getFileType} from '../../src/helpers/fileTypeHelper';
-
-const DEFAULT_CFG = {
-  dictionaries: { doctors: [] as string[], diagnosis: [] as string[] },
-  settings    : { theme: "light" as "light" | "dark", locale: "en" as "en" | "ua", praatPath: "" as string, defaultPatientCard: null as string | null },
-  session     : { currentDoctor: null as string | null },
-  shownTabs   : [
-    { name: "video_materials", folder: "video" },
-    { name: "voice_report", folder: "audio" },
-    { name: "tests", folder: "tests" }
-  ] as { name: string; folder: string }[],
-};
+import {
+  getAllPatients,
+  getPatientByFolderPath,
+  updatePatientMetadata,
+  createPatient,
+  getAppointmentData,
+  updateAppointmentData,
+  getPatientTests,
+  createPatientTest,
+  updatePatientTest,
+  deletePatientTest,
+  getAllDoctors,
+  getAllDiagnoses,
+  createDoctor,
+  createDiagnosis,
+  getSetting,
+  setSetting,
+  getSessionData,
+  setSessionData,
+  getAllTabs,
+  updateTabs,
+} from '../../database/dao';
 
 const isClip = (f: string) =>
   [".mp4", ".avi"].includes(extname(f).toLowerCase());
@@ -51,13 +62,20 @@ const copySession = async (
   await ensureDir(videoDir);
   await ensureDir(voiceDir);
 
-  const patientConfigFile = path.join(patientRoot, "patient.config");
-  if (!(await exists(patientConfigFile))) {
-    await fs.writeFile(patientConfigFile, JSON.stringify({ doctor: "", diagnosis: "", patientCard: "" }, null, 2), "utf8");
+  // Create patient in database if doesn't exist
+  try {
+    // Parse patient info from folder name
+    const [surname = '', name = '', dob = ''] = patientBase.split('_');
+    createPatient(patientBase, recDate, {
+      name: `${surname} ${name}`.trim(),
+      birthdate: dob,
+      doctor: '',
+      diagnosis: '',
+      patientCard: defaultPatientCard || undefined,
+    });
+  } catch (error) {
+    console.error('Failed to create patient in database:', error);
   }
-
-  const cfgFile = path.join(appointmentRoot, "appointment.config");
-  if (!(await exists(cfgFile))) await fs.writeFile(cfgFile, "{}", "utf8");
 
   if ((await fs.readdir(videoDir)).some(isClip)) return;
 
@@ -83,11 +101,8 @@ const copySession = async (
         // Copy the file
         await fs.copyFile(sourceCardPath, destinationPath);
         
-        // Update patient.config to include the patient card
-        const currentConfig = await fs.readFile(patientConfigFile, 'utf8');
-        const config = JSON.parse(currentConfig);
-        config.patientCard = defaultPatientCard;
-        await fs.writeFile(patientConfigFile, JSON.stringify(config, null, 2), 'utf8');
+        // Update patient card in database
+        updatePatientMetadata(patientBase, { patientCard: defaultPatientCard });
       }
     } catch (error) {
       console.error('Failed to copy patient card during USB import:', error);
@@ -167,10 +182,8 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
   const settingsRoot = path.join(appDataFolder, "settings");
   await ensureDir(settingsRoot);
 
-  const appCfg = path.join(settingsRoot, "app.config");
-
   ipcMain.handle("getProjects", async () => {
-    return buildProjects(patientsRoot);
+    return getAllPatients();
   });
 
   ipcMain.handle("scanUsb", async () => {
@@ -181,9 +194,8 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
 
     const usb = filePaths[0];
 
-    // Get default patient card
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    const defaultPatientCard = cfg.settings.defaultPatientCard;
+    // Get default patient card from settings
+    const defaultPatientCard = getSetting('defaultPatientCard');
 
     const entries = await fs.readdir(usb, { withFileTypes: true });
     
@@ -192,7 +204,7 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
     const totalFolders = validFolders.length;
     
     if (totalFolders === 0) {
-      return buildProjects(patientsRoot);
+      return getAllPatients();
     }
     
     // Process folders with progress updates
@@ -211,121 +223,89 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
       await copySession(patientsRoot, path.join(usb, e.name), e.name, defaultPatientCard);
     }
 
-    return buildProjects(patientsRoot);
+    return getAllPatients();
   });
 
-  const ensureJson = async (file: string, init: any) => {
-    try { await fs.access(file); }
-    catch {
-      await fs.writeFile(file, JSON.stringify(init, null, 2), "utf8");
-      return structuredClone(init);
-    }
-    try { return JSON.parse(await fs.readFile(file, "utf8")); }
-    catch {
-      await fs.writeFile(file, JSON.stringify(init, null, 2), "utf8");
-      return structuredClone(init);
-    }
-  };
-
-  const saveJson = (file: string, data: any) =>
-    fs.writeFile(file, JSON.stringify(data, null, 2), "utf8");
 
   ipcMain.handle("dict:get", async () => {
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    return cfg.dictionaries;
+    const doctors = getAllDoctors();
+    const diagnoses = getAllDiagnoses();
+    return {
+      doctors: doctors.map(d => d.name),
+      diagnosis: diagnoses.map(d => d.name),
+    };
   });
 
   ipcMain.handle(
     "dict:add",
     async (_e, type: "doctors" | "diagnosis", value: string) => {
-      const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-      if (!cfg.dictionaries[type].includes(value)) {
-        cfg.dictionaries[type].push(value);
-        await saveJson(appCfg, cfg);
+      if (type === "doctors") {
+        createDoctor(value);
+      } else {
+        createDiagnosis(value);
       }
     },
   );
 
   ipcMain.handle("settings:get", async () => {
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    return cfg.settings;
+    return {
+      theme: getSetting('theme') || 'light',
+      locale: getSetting('locale') || 'en',
+      praatPath: getSetting('praatPath') || '',
+      defaultPatientCard: getSetting('defaultPatientCard') || null,
+    };
   });
+  
   ipcMain.handle("settings:set", async (_e, patch) => {
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    cfg.settings = { ...cfg.settings, ...patch };
-    await saveJson(appCfg, cfg);
+    if (patch.theme !== undefined) setSetting('theme', patch.theme);
+    if (patch.locale !== undefined) setSetting('locale', patch.locale);
+    if (patch.praatPath !== undefined) setSetting('praatPath', patch.praatPath);
+    if (patch.defaultPatientCard !== undefined) setSetting('defaultPatientCard', patch.defaultPatientCard);
   });
 
   ipcMain.handle("session:get", async () => {
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    return cfg.session;
+    return {
+      currentDoctor: getSessionData('currentDoctor') || null,
+    };
   });
+  
   ipcMain.handle("session:set", async (_e, patch) => {
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    cfg.session = { ...cfg.session, ...patch };
-    await saveJson(appCfg, cfg);
+    if (patch.currentDoctor !== undefined) setSessionData('currentDoctor', patch.currentDoctor);
   });
 
   ipcMain.handle("shownTabs:get", async () => {
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    return cfg.shownTabs;
+    const tabs = getAllTabs();
+    return tabs.map(t => ({ name: t.name, folder: t.folder }));
   });
+  
   ipcMain.handle("shownTabs:set", async (_e, tabs) => {
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    cfg.shownTabs = tabs;
-    await saveJson(appCfg, cfg);
+    updateTabs(tabs);
   });
 
-  const patientCfg = (folder: string) => {
-    return path.join(patientsRoot, folder, "patient.config");
-  };
-
-  ipcMain.handle("patient:getMeta", async (_e, folder: string) =>
-    ensureJson(patientCfg(folder), { doctor: "", diagnosis: "", patientCard: "" }),
-  );
+  ipcMain.handle("patient:getMeta", async (_e, folder: string) => {
+    return getPatientByFolderPath(folder);
+  });
+  
   ipcMain.handle("patient:setMeta", async (_e, folder: string, data: any) => {
-    const file = patientCfg(folder);
-    const cur = await ensureJson(file, {});
-    await saveJson(file, { ...cur, ...data });
+    updatePatientMetadata(folder, data);
   });
-
-
 
   ipcMain.handle("patient:appointments", async (_e, folder: string) => {
-    const patientRoot = path.join(patientsRoot, folder);
-    try {
-      const entries = await fs.readdir(patientRoot, { withFileTypes: true });
-      const appointments = [];
-      
-      for (const entry of entries) {
-        if (entry.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(entry.name)) {
-          const appointmentDir = path.join(patientRoot, entry.name);
-          const configFile = path.join(appointmentDir, "appointment.config");
-          const config = await ensureJson(configFile, { doctors: "", diagnosis: "", notes: "" });
-          
-          appointments.push({
-            date: entry.name,
-            ...config
-          });
-        }
-      }
-      
-      return appointments.sort((a, b) => b.date.localeCompare(a.date));
-    } catch {
-      return [];
-    }
+    const patient = getPatientByFolderPath(folder);
+    return patient?.appointments || [];
   });
 
   ipcMain.handle("patient:getAppointment", async (_e, appointmentPath: string) => {
-    const configFile = path.join(patientsRoot, appointmentPath, "appointment.config");
-    return ensureJson(configFile, { doctors: [] as string[], diagnosis: "", notes: "" });
+    const [folder, date] = appointmentPath.split('/').slice(-2);
+    const fullFolder = appointmentPath.replace(`/${date}`, '');
+    return getAppointmentData(fullFolder, date);
   });
 
   ipcMain.handle("patient:setAppointment", async (_e, appointmentPath: string, data: any) => {
-    const configFile = path.join(patientsRoot, appointmentPath, "appointment.config");
-    const cur = await ensureJson(configFile, { doctors: [] as string[], diagnosis: "", notes: "" });
-
-    await saveJson(configFile, { ...cur, ...data });
+    const parts = appointmentPath.split('/');
+    const date = parts[parts.length - 1];
+    const folder = parts.slice(0, -1).join('/');
+    updateAppointmentData(folder, date, data);
   });
 
   /* ---------- live counts & clips ---------- */
@@ -348,25 +328,8 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
     const appt  = path.join(pRoot, date, "video");
     await ensureDir(appt);
     
-    // Create patient.config in patient folder
-    const patientConfigFile = path.join(pRoot, "patient.config");
-    if (!(await exists(patientConfigFile))) {
-      const patientConfig = metadata ? 
-        { doctor: metadata.doctor, diagnosis: metadata.diagnosis, patientCard: metadata.patientCard || "" } : 
-        { doctor: "", diagnosis: "", patientCard: "" };
-      await fs.writeFile(patientConfigFile, JSON.stringify(patientConfig, null, 2), "utf8");
-    }
-    
-    // Create appointment.config in appointment folder with patient data
-    let appointmentConfig = {};
-    if (metadata) {
-      appointmentConfig = {
-        doctors: [metadata.doctor],
-        diagnosis: metadata.diagnosis,
-        notes: ""
-      };
-    }
-    await fs.writeFile(path.join(pRoot, date, "appointment.config"), JSON.stringify(appointmentConfig, null, 2), "utf8");
+    // Create patient in database
+    createPatient(base, date, metadata);
   });
 
   ipcMain.handle("patient:openFolder", async (_e, folder: string) => {
@@ -863,14 +826,11 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
 
   // Default Patient Card operations
   ipcMain.handle("defaultPatientCard:get", async () => {
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    return cfg.settings.defaultPatientCard;
+    return getSetting('defaultPatientCard') || null;
   });
 
   ipcMain.handle("defaultPatientCard:set", async (_e, fileName: string | null) => {
-    const cfg = await ensureJson(appCfg, DEFAULT_CFG);
-    cfg.settings.defaultPatientCard = fileName;
-    await saveJson(appCfg, cfg);
+    setSetting('defaultPatientCard', fileName);
   });
 
   // Copy patient card to patient folder
@@ -1298,28 +1258,7 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
 
   ipcMain.handle("patientTests:getAll", async (_e, folder: string, currentAppointment?: string) => {
     try {
-      let testsDir: string;
-      if (currentAppointment) {
-        testsDir = path.join(patientsRoot, folder, currentAppointment, "tests");
-      } else {
-        const apptDir = await latestAppointmentDir(patientsRoot, folder);
-        testsDir = path.join(apptDir, "tests");
-      }
-      
-      await ensureDir(testsDir);
-      const entries = await fs.readdir(testsDir, { withFileTypes: true });
-      
-      const tests = await Promise.all(
-        entries
-          .filter(entry => entry.isFile() && entry.name.endsWith('.json'))
-          .map(async (entry) => {
-            const filePath = path.join(testsDir, entry.name);
-            const content = await fs.readFile(filePath, 'utf8');
-            return JSON.parse(content);
-          })
-      );
-      
-      return tests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      return getPatientTests(folder, currentAppointment);
     } catch (error) {
       console.error('Error loading patient tests:', error);
       return [];
@@ -1328,51 +1267,7 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
 
   ipcMain.handle("patientTests:create", async (_e, folder: string, currentAppointment: string | undefined, testId: string, testData: any) => {
     try {
-      let testsDir: string;
-      if (currentAppointment) {
-        testsDir = path.join(patientsRoot, folder, currentAppointment, "tests");
-      } else {
-        const apptDir = await latestAppointmentDir(patientsRoot, folder);
-        testsDir = path.join(apptDir, "tests");
-      }
-      
-      await ensureDir(testsDir);
-      
-      const now = new Date().toISOString();
-      const patientTest = {
-        id: `patient_test_${Date.now()}`,
-        testId,
-        testName: testData.name,
-        testType: testData.testType,
-        createdAt: now,
-        updatedAt: now,
-        testData: {
-          questions: testData.testData.questions,
-          diagnosisRanges: testData.testData.diagnosisRanges,
-          answerOptions: testData.testData.answerOptions
-        },
-        progress: {
-          currentQuestionIndex: 0,
-          answers: [],
-          completed: false,
-          score: 0,
-          diagnosis: null,
-          completedAt: null
-        }
-      };
-      
-      // Create filename based on test name (sanitized)
-      const sanitizedName = testData.name
-        .replace(/[^a-zA-Z0-9а-яА-ЯіІїЇєЄ\s]/g, '')
-        .replace(/\s+/g, '_')
-        .substring(0, 50);
-      
-      const fileName = `${sanitizedName}_${patientTest.id}.json`;
-      const filePath = path.join(testsDir, fileName);
-      
-      await fs.writeFile(filePath, JSON.stringify(patientTest, null, 2), 'utf8');
-      
-      return patientTest;
+      return createPatientTest(folder, currentAppointment, testId, testData);
     } catch (error) {
       console.error('Error creating patient test:', error);
       throw error;
@@ -1381,48 +1276,7 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
 
   ipcMain.handle("patientTests:update", async (_e, folder: string, currentAppointment: string | undefined, patientTestId: string, progressData: any) => {
     try {
-      let testsDir: string;
-      if (currentAppointment) {
-        testsDir = path.join(patientsRoot, folder, currentAppointment, "tests");
-      } else {
-        const apptDir = await latestAppointmentDir(patientsRoot, folder);
-        testsDir = path.join(apptDir, "tests");
-      }
-      
-      const files = await fs.readdir(testsDir, { withFileTypes: true });
-      let existingFilePath = null;
-      let existingTest = null;
-      
-      for (const file of files) {
-        if (file.isFile() && file.name.endsWith('.json')) {
-          const filePath = path.join(testsDir, file.name);
-          const content = await fs.readFile(filePath, 'utf8');
-          const test = JSON.parse(content);
-          
-          if (test.id === patientTestId) {
-            existingFilePath = filePath;
-            existingTest = test;
-            break;
-          }
-        }
-      }
-      
-      if (!existingTest || !existingFilePath) {
-        throw new Error('Patient test not found');
-      }
-      
-      const updatedTest = {
-        ...existingTest,
-        progress: {
-          ...existingTest.progress,
-          ...progressData
-        },
-        updatedAt: new Date().toISOString()
-      };
-      
-      await fs.writeFile(existingFilePath, JSON.stringify(updatedTest, null, 2), 'utf8');
-      
-      return updatedTest;
+      return updatePatientTest(folder, currentAppointment, patientTestId, progressData);
     } catch (error) {
       console.error('Error updating patient test:', error);
       throw error;
@@ -1431,30 +1285,7 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
 
   ipcMain.handle("patientTests:delete", async (_e, folder: string, currentAppointment: string | undefined, patientTestId: string) => {
     try {
-      let testsDir: string;
-      if (currentAppointment) {
-        testsDir = path.join(patientsRoot, folder, currentAppointment, "tests");
-      } else {
-        const apptDir = await latestAppointmentDir(patientsRoot, folder);
-        testsDir = path.join(apptDir, "tests");
-      }
-      
-      const files = await fs.readdir(testsDir, { withFileTypes: true });
-      
-      for (const file of files) {
-        if (file.isFile() && file.name.endsWith('.json')) {
-          const filePath = path.join(testsDir, file.name);
-          const content = await fs.readFile(filePath, 'utf8');
-          const test = JSON.parse(content);
-          
-          if (test.id === patientTestId) {
-            await fs.unlink(filePath);
-            return { success: true };
-          }
-        }
-      }
-      
-      throw new Error('Patient test not found');
+      return deletePatientTest(folder, patientTestId);
     } catch (error) {
       console.error('Error deleting patient test:', error);
       throw error;
