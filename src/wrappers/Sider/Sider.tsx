@@ -1,6 +1,6 @@
 import React from "react";
 import { Layout, Menu } from "antd";
-import { UserOutlined, SettingOutlined, ExperimentOutlined } from "@ant-design/icons";
+import { UserOutlined, SettingOutlined, ExperimentOutlined, BookOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
 
 interface Props {
@@ -28,6 +28,11 @@ export const AppSider: React.FC<Props> = ({ collapsed }) => {
       key: "/tests",
       icon: <ExperimentOutlined />,
       label: "Конструктор тестів",
+    },
+    {
+      key: "/dictionaries",
+      icon: <BookOutlined />,
+      label: "Словники",
     },
     {
       key: "/settings",

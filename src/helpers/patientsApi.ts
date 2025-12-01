@@ -6,6 +6,8 @@ export interface Patient {
   diagnosis: string;
   patientCard: string;
   folder: string; // Keep for backward compatibility
+  statusId: number;
+  statusName: string;
 }
 
 export interface AppointmentConfig {
@@ -29,6 +31,8 @@ export interface Patient extends PatientConfig {
   birthdate: string;
   latestAppointmentDate: string;
   appointments: Appointment[];
+  statusId: number;
+  statusName: string;
 }
 
 export interface PatientFilters {
@@ -38,6 +42,7 @@ export interface PatientFilters {
   appointmentDate?: [any, any] | null;
   doctor?: string[];
   diagnosis?: string[];
+  status?: number[];
   sortField?: string;
   sortOrder?: 'ascend' | 'descend';
   page?: number;
@@ -58,6 +63,7 @@ export interface TableState {
     appointmentDate?: [any, any][];
     doctor?: string[];
     diagnosis?: string[];
+    status?: number[];
   };
   sorter: {
     field?: string;
@@ -74,7 +80,8 @@ export interface PaginatedResult<T> {
 }
 
 export const getPatients = async (filters?: PatientFilters): Promise<PaginatedResult<Patient>> => {
-  const allPatients = await window.ipcRenderer.invoke("getProjects");
+  // Get patients from database
+  const allPatients = await window.ipcRenderer.invoke("db:patients:getAll");
 
   let filteredPatients = allPatients;
 
@@ -143,6 +150,11 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
         if (!filters.diagnosis.includes(patient.diagnosis)) return false;
       }
       
+      // Status filter
+      if (filters.status && filters.status.length > 0) {
+        if (!filters.status.includes(patient.statusId)) return false;
+      }
+      
       return true;
     });
   }
@@ -181,6 +193,11 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
           valueB = b.diagnosis || '';
           comparison = String(valueA).localeCompare(String(valueB));
           break;
+        case 'status': // Status
+          valueA = a.statusName || '';
+          valueB = b.statusName || '';
+          comparison = String(valueA).localeCompare(String(valueB));
+          break;
         case 'appointmentDate':
         default:
           // Parse YYYY-MM-DD format explicitly
@@ -214,20 +231,93 @@ export const getPatients = async (filters?: PatientFilters): Promise<PaginatedRe
   };
 };
 
-// USB and project operations
-export const scanUsb = (): Promise<Patient[]> => window.ipcRenderer.invoke("scanUsb");
-export const makePatient = (base: string, date: string, metadata?: { name: string; birthdate: string; doctor: string; diagnosis: string; patientCard?: string }) => window.ipcRenderer.invoke("patient:new", base, date, metadata);
-export const openPatientFolderInFs = (folder: string) => window.ipcRenderer.invoke("patient:openFolder", folder);
+// USB import - combines FS operations with DB creation
+export const scanUsb = async (): Promise<Patient[]> => {
+  // First, get USB folder info from filesystem
+  const usbResult = await window.ipcRenderer.invoke("fs:scanUsb");
+  
+  if (usbResult.canceled || usbResult.folders.length === 0) {
+    return window.ipcRenderer.invoke("db:patients:getAll");
+  }
 
-// Patient data operations
-export const getPatientAppointment = (appointmentPath: string) => window.ipcRenderer.invoke("patient:getAppointment", appointmentPath);
+  // Get default patient card setting from database
+  const defaultPatientCard = await window.ipcRenderer.invoke("db:settings:get", 'defaultPatientCard');
+  
+  const totalFolders = usbResult.folders.length;
+  
+  // Process each folder
+  for (let i = 0; i < usbResult.folders.length; i++) {
+    const folder = usbResult.folders[i];
+    const progress = Math.round(((i + 1) / totalFolders) * 100);
+    
+    // Send progress update
+    await window.ipcRenderer.invoke("fs:sendImportProgress", {
+      current: i + 1,
+      total: totalFolders,
+      progress,
+      folderName: folder.folderName,
+    });
+    
+    // Copy files from USB
+    const copyResult = await window.ipcRenderer.invoke(
+      "fs:copyUsbSession",
+      folder.fullPath,
+      folder.patientBase,
+      folder.recDate
+    );
+    
+    // Create patient in database
+    if (!copyResult.skipped) {
+      const [surname = '', name = '', dob = ''] = folder.patientBase.split('_');
+      await window.ipcRenderer.invoke("db:patients:create", folder.patientBase, folder.recDate, {
+        name: `${surname} ${name}`.trim(),
+        birthdate: dob,
+        doctor: '',
+        diagnosis: '',
+        patientCard: defaultPatientCard || undefined,
+      });
+      
+      // Copy patient card if available
+      if (defaultPatientCard) {
+        await window.ipcRenderer.invoke("fs:patientCards:copyToPatient", defaultPatientCard, folder.patientBase);
+        await window.ipcRenderer.invoke("db:patients:updateMeta", folder.patientBase, { patientCard: defaultPatientCard });
+      }
+    }
+  }
+
+  return window.ipcRenderer.invoke("db:patients:getAll");
+};
+
+// Create new patient - combines FS and DB operations
+export const makePatient = async (
+  base: string,
+  date: string,
+  metadata?: { name: string; birthdate: string; doctor: string; diagnosis: string; patientCard?: string }
+) => {
+  // Create folder structure
+  await window.ipcRenderer.invoke("fs:patient:createFolders", base, date);
+  
+  // Create patient in database
+  await window.ipcRenderer.invoke("db:patients:create", base, date, metadata);
+};
+
+export const openPatientFolderInFs = (folder: string) => 
+  window.ipcRenderer.invoke("fs:patient:openFolder", folder);
+
+// Patient data operations - DB only
+export const getPatientAppointment = async (appointmentPath: string) => {
+  const parts = appointmentPath.split('/');
+  const date = parts[parts.length - 1];
+  const folder = parts.slice(0, -1).join('/');
+  return window.ipcRenderer.invoke("db:appointments:get", folder, date);
+};
 
 export const getPatientMeta = async (folder: string): Promise<Patient> => {
-  // Get patient-level data from patient.config
-  const meta = await window.ipcRenderer.invoke("patient:getMeta", folder);
+  // Get patient-level data from database
+  const meta = await window.ipcRenderer.invoke("db:patients:getByFolder", folder);
   
-  // Get appointments (date folders inside patient folder)
-  const appointments = await window.ipcRenderer.invoke("patient:appointments", folder);
+  // Get appointments from database
+  const appointments = await window.ipcRenderer.invoke("db:patients:getAppointments", folder);
 
   // Sort appointments by date (newest first)
   const sortedAppointments = appointments.sort((a: Appointment, b: Appointment) =>
@@ -240,39 +330,47 @@ export const getPatientMeta = async (folder: string): Promise<Patient> => {
   };
 };
 
-// Save data to patient.config (patient-level)
+// Save data to patient (patient-level) - DB only
 export const setPatient = (folder: string, data: { doctor?: string; diagnosis?: string; patientCard?: string }) =>
-  window.ipcRenderer.invoke("patient:setMeta", folder, data);
+  window.ipcRenderer.invoke("db:patients:updateMeta", folder, data);
 
-// Save data to appointment.config (appointment-level)
-export const setPatientAppointments = (appointmentPath: string, data: { doctors?: string[]; diagnosis?: string; notes?: string }) =>
-  window.ipcRenderer.invoke("patient:setAppointment", appointmentPath, data);
+// Save data to appointment (appointment-level) - DB only
+export const setPatientAppointments = async (appointmentPath: string, data: { doctors?: string[]; diagnosis?: string; notes?: string }) => {
+  const parts = appointmentPath.split('/');
+  const date = parts[parts.length - 1];
+  const folder = parts.slice(0, -1).join('/');
+  return window.ipcRenderer.invoke("db:appointments:update", folder, date, data);
+};
 
-// Audio-related functions
+// Audio-related functions - FS only
 export const getAudioFiles = (baseFolder: string, currentAppointment?: string) => 
-  window.ipcRenderer.invoke("patient:audioFiles", baseFolder, currentAppointment);
+  window.ipcRenderer.invoke("fs:patient:audioFiles", baseFolder, currentAppointment);
 
 export const loadMoreAudio = (baseFolder: string, currentAppointment?: string) => 
-  window.ipcRenderer.invoke("patient:loadMoreAudio", baseFolder, currentAppointment);
+  window.ipcRenderer.invoke("fs:patient:loadMoreAudio", baseFolder, currentAppointment);
 
 export const openAudioFolder = (baseFolder: string, currentAppointment?: string) => 
-  window.ipcRenderer.invoke("patient:openAudioFolder", baseFolder, currentAppointment);
+  window.ipcRenderer.invoke("fs:patient:openAudioFolder", baseFolder, currentAppointment);
+
 export const saveRecordedAudio = (baseFolder: string, currentAppointment: string | undefined, arrayBuffer: ArrayBuffer, filename: string) => 
-  window.ipcRenderer.invoke("patient:saveRecordedAudio", baseFolder, currentAppointment, arrayBuffer, filename);
+  window.ipcRenderer.invoke("fs:patient:saveRecordedAudio", baseFolder, currentAppointment, arrayBuffer, filename);
 
-// Video-related functions
+// Video-related functions - FS only
 export const getClipsDetailed = (baseFolder: string, offset: number, limit: number, currentAppointment?: string) => 
-  window.ipcRenderer.invoke("patient:clipsDetailed", baseFolder, offset, limit, currentAppointment);
-export const loadMoreVideos = (baseFolder: string, currentAppointment?: string) => 
-  window.ipcRenderer.invoke("patient:loadMoreVideos", baseFolder, currentAppointment);
+  window.ipcRenderer.invoke("fs:patient:clipsDetailed", baseFolder, offset, limit, currentAppointment);
 
-// Custom tab functions
+export const loadMoreVideos = (baseFolder: string, currentAppointment?: string) => 
+  window.ipcRenderer.invoke("fs:patient:loadMoreVideos", baseFolder, currentAppointment);
+
+// Custom tab functions - FS only
 export const getCustomTabFiles = (baseFolder: string, tabName: string, currentAppointment?: string) => 
-  window.ipcRenderer.invoke("getCustomTabFiles", baseFolder, tabName, currentAppointment);
+  window.ipcRenderer.invoke("fs:customTab:getFiles", baseFolder, tabName, currentAppointment);
+
 export const selectAndCopyFiles = (baseFolder: string, tabName: string, currentAppointment?: string) => 
-  window.ipcRenderer.invoke("selectAndCopyFiles", baseFolder, tabName, currentAppointment);
+  window.ipcRenderer.invoke("fs:customTab:selectAndCopyFiles", baseFolder, tabName, currentAppointment);
+
 export const openFileInDefaultApp = (filePath: string) => 
-  window.ipcRenderer.invoke("openFileInDefaultApp", filePath);
+  window.ipcRenderer.invoke("fs:openFileInDefaultApp", filePath);
 
 // Utility function
 export const parsePatientFolder = (folder: string) => {
@@ -280,4 +378,44 @@ export const parsePatientFolder = (folder: string) => {
   return { surname, name, dob };
 };
 
+// Patient status operations
+export interface PatientStatus {
+  id: number;
+  name: string;
+  isSystem: boolean;
+}
 
+export const getPatientStatuses = async (): Promise<PatientStatus[]> => {
+  return window.ipcRenderer.invoke("db:patientStatuses:getAll");
+};
+
+export const updatePatientStatus = async (folder: string, statusId: number): Promise<void> => {
+  await window.ipcRenderer.invoke("db:patients:updateStatus", folder, statusId);
+};
+
+// Patient rename operations
+export const checkPatientExists = async (folder: string): Promise<boolean> => {
+  return window.ipcRenderer.invoke("db:patients:exists", folder);
+};
+
+export const renamePatient = async (
+  oldFolder: string,
+  newFolder: string,
+  surname: string,
+  name: string,
+  birthdate: string
+): Promise<{ success: boolean; error?: string }> => {
+  // First rename the folder on filesystem
+  const fsResult = await window.ipcRenderer.invoke("fs:patient:renameFolder", oldFolder, newFolder);
+  if (!fsResult.success) {
+    return fsResult;
+  }
+  
+  // Then update the database
+  const dbResult = await window.ipcRenderer.invoke("db:patients:rename", oldFolder, newFolder, surname, name, birthdate);
+  return dbResult;
+};
+
+export const buildPatientFolder = (surname: string, name: string, birthdate: string): string => {
+  return `${surname}_${name}_${birthdate}`;
+};

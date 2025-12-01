@@ -8,6 +8,9 @@ export * from './entities/doctor';
 // Diagnosis entity
 export * from './entities/diagnosis';
 
+// Patient Status entity
+export * from './entities/patientStatus';
+
 // Patient entity
 export * from './entities/patient';
 
@@ -31,4 +34,7 @@ export * from './entities/testTemplate';
 
 // PatientTest entity
 export * from './entities/patientTest';
+
+// StoragePath entity
+export * from './entities/storagePath';
 

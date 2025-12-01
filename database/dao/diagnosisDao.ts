@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '../connection';
-import { diagnoses, type Diagnosis, type NewDiagnosis } from '../models';
+import { diagnoses, type Diagnosis } from '../models';
 
 /**
  * Get all diagnoses
@@ -76,4 +76,3 @@ export function deleteDiagnosis(id: number): void {
   const db = getDb();
   db.delete(diagnoses).where(eq(diagnoses.id, id)).run();
 }
-

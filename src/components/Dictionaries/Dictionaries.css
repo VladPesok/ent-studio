@@ -1,0 +1,22 @@
+.dictionaries-wrapper {
+  width: 100%;
+}
+
+.dictionaries-container {
+  margin: 24px;
+  padding: 24px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.dictionaries-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.dictionaries-header h3 {
+  margin: 0;
+}
+

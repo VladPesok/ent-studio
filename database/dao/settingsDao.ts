@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { ipcMain } from 'electron';
 import { getDb } from '../connection';
 import { settings } from '../models';
 
@@ -68,3 +69,24 @@ export function deleteSetting(key: string): void {
   db.delete(settings).where(eq(settings.key, key)).run();
 }
 
+/**
+ * Setup IPC handlers for settings operations
+ */
+export function setupSettingsIpcHandlers(): void {
+  ipcMain.handle("db:settings:get", async (_e, key: string) => {
+    return getSetting(key);
+  });
+
+  ipcMain.handle("db:settings:getAll", async () => {
+    return {
+      theme: getSetting('theme') || 'light',
+      locale: getSetting('locale') || 'en',
+      praatPath: getSetting('praatPath') || '',
+      defaultPatientCard: getSetting('defaultPatientCard') || null,
+    };
+  });
+
+  ipcMain.handle("db:settings:set", async (_e, key: string, value: any) => {
+    setSetting(key, value);
+  });
+}

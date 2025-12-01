@@ -1,6 +1,7 @@
-import { eq, sql, desc } from 'drizzle-orm';
+import { eq, sql, desc, and } from 'drizzle-orm';
+import { ipcMain } from 'electron';
 import { getDb } from '../connection';
-import { patients, appointments, doctors, diagnoses, type Patient, type NewPatient } from '../models';
+import { patients, appointments, doctors, diagnoses, patientStatuses, PATIENT_STATUS_ACTIVE, type Patient, type NewPatient } from '../models';
 import { getOrCreateDoctor } from './doctorDao';
 import { getOrCreateDiagnosis } from './diagnosisDao';
 
@@ -20,6 +21,8 @@ export function getAllPatients() {
       patientCardPath: patients.patientCardPath,
       doctor: doctors.name,
       diagnosis: diagnoses.name,
+      statusId: patients.statusId,
+      statusName: patientStatuses.name,
       latestAppointmentDate: sql<string>`(
         SELECT MAX(${appointments.appointmentDate})
         FROM ${appointments}
@@ -29,6 +32,7 @@ export function getAllPatients() {
     .from(patients)
     .leftJoin(doctors, eq(patients.primaryDoctorId, doctors.id))
     .leftJoin(diagnoses, eq(patients.primaryDiagnosisId, diagnoses.id))
+    .leftJoin(patientStatuses, eq(patients.statusId, patientStatuses.id))
     .orderBy(patients.surname, patients.name)
     .all();
 
@@ -40,6 +44,8 @@ export function getAllPatients() {
     diagnosis: r.diagnosis || '',
     patientCard: r.patientCardPath || '',
     folder: r.folderPath,
+    statusId: r.statusId || PATIENT_STATUS_ACTIVE,
+    statusName: r.statusName || 'Активний',
   }));
 }
 
@@ -59,10 +65,13 @@ export function getPatientByFolderPath(folderPath: string) {
       patientCardPath: patients.patientCardPath,
       doctor: doctors.name,
       diagnosis: diagnoses.name,
+      statusId: patients.statusId,
+      statusName: patientStatuses.name,
     })
     .from(patients)
     .leftJoin(doctors, eq(patients.primaryDoctorId, doctors.id))
     .leftJoin(diagnoses, eq(patients.primaryDiagnosisId, diagnoses.id))
+    .leftJoin(patientStatuses, eq(patients.statusId, patientStatuses.id))
     .where(eq(patients.folderPath, folderPath))
     .get();
 
@@ -88,6 +97,8 @@ export function getPatientByFolderPath(folderPath: string) {
     diagnosis: patient.diagnosis || '',
     patientCard: patient.patientCardPath || '',
     folder: patient.folderPath,
+    statusId: patient.statusId || PATIENT_STATUS_ACTIVE,
+    statusName: patient.statusName || 'Активний',
     appointments: patientAppointments,
   };
 }
@@ -145,8 +156,10 @@ export function createPatient(
       .select({ id: appointments.id })
       .from(appointments)
       .where(
-        eq(appointments.patientId, patientId),
-        eq(appointments.appointmentDate, appointmentDate)
+        and(
+          eq(appointments.patientId, patientId),
+          eq(appointments.appointmentDate, appointmentDate)
+        )
       )
       .get();
 
@@ -213,3 +226,100 @@ export function deletePatient(folderPath: string): void {
   db.delete(patients).where(eq(patients.folderPath, folderPath)).run();
 }
 
+/**
+ * Update patient's status
+ */
+export function setPatientStatus(folderPath: string, statusId: number): void {
+  const db = getDb();
+  
+  db.update(patients)
+    .set({
+      statusId,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(patients.folderPath, folderPath))
+    .run();
+}
+
+/**
+ * Check if a patient folder already exists
+ */
+export function patientFolderExists(folderPath: string): boolean {
+  const db = getDb();
+  const existing = db
+    .select({ id: patients.id })
+    .from(patients)
+    .where(eq(patients.folderPath, folderPath))
+    .get();
+  return !!existing;
+}
+
+/**
+ * Rename patient (update folder path and name in database)
+ */
+export function renamePatient(
+  oldFolderPath: string,
+  newFolderPath: string,
+  newSurname: string,
+  newName: string,
+  newBirthdate: string
+): { success: boolean; error?: string } {
+  const db = getDb();
+  
+  // Check if new folder already exists
+  if (patientFolderExists(newFolderPath)) {
+    return { success: false, error: 'Пацієнт з таким іменем вже існує' };
+  }
+  
+  // Update patient record
+  db.update(patients)
+    .set({
+      folderPath: newFolderPath,
+      surname: newSurname,
+      name: newName,
+      birthdate: newBirthdate,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(patients.folderPath, oldFolderPath))
+    .run();
+    
+  return { success: true };
+}
+
+/**
+ * Setup IPC handlers for patient operations
+ */
+export function setupPatientIpcHandlers(): void {
+  ipcMain.handle("db:patients:getAll", async () => {
+    return getAllPatients();
+  });
+
+  ipcMain.handle("db:patients:getByFolder", async (_e, folder: string) => {
+    return getPatientByFolderPath(folder);
+  });
+
+  ipcMain.handle("db:patients:updateMeta", async (_e, folder: string, data: any) => {
+    updatePatientMetadata(folder, data);
+  });
+
+  ipcMain.handle("db:patients:create", async (_e, base: string, date: string, metadata?: { name: string; birthdate: string; doctor: string; diagnosis: string; patientCard?: string }) => {
+    return createPatient(base, date, metadata);
+  });
+
+  ipcMain.handle("db:patients:getAppointments", async (_e, folder: string) => {
+    const patient = getPatientByFolderPath(folder);
+    return patient?.appointments || [];
+  });
+
+  ipcMain.handle("db:patients:updateStatus", async (_e, folder: string, statusId: number) => {
+    setPatientStatus(folder, statusId);
+  });
+
+  ipcMain.handle("db:patients:exists", async (_e, folder: string) => {
+    return patientFolderExists(folder);
+  });
+
+  ipcMain.handle("db:patients:rename", async (_e, oldFolder: string, newFolder: string, surname: string, name: string, birthdate: string) => {
+    return renamePatient(oldFolder, newFolder, surname, name, birthdate);
+  });
+}

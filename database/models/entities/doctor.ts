@@ -6,8 +6,8 @@ export const doctors = sqliteTable('doctors', {
   name: text('name').notNull().unique(),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  deletedAt: text('deleted_at'),
 });
 
 export type Doctor = typeof doctors.$inferSelect;
 export type NewDoctor = typeof doctors.$inferInsert;
-

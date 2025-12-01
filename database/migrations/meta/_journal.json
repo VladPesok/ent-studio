@@ -8,6 +8,34 @@
       "when": 1762730162906,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1733100000000,
+      "tag": "0001_add_deleted_at",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1733200000000,
+      "tag": "0002_add_patient_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1733300000000,
+      "tag": "0003_add_storage_paths",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1733400000000,
+      "tag": "0004_add_tabs_visibility",
+      "breakpoints": true
     }
   ]
 }

@@ -13,6 +13,12 @@ import {
   Typography,
   Tooltip,
   message,
+  Tag,
+  Dropdown,
+  Modal,
+  DatePicker,
+  MenuProps,
+  Space,
 } from "antd";
 import {
   VideoCameraOutlined,
@@ -21,7 +27,9 @@ import {
   FolderOpenOutlined,
   PlusOutlined,
   ExperimentOutlined,
+  EditOutlined,
 } from "@ant-design/icons";
+import dayjs from "dayjs";
 import { useTranslation } from "react-i18next";
 
 import VideoGallery from "./VideoGallery/VideoGallery";
@@ -49,6 +57,7 @@ const fmt = (iso?: string) =>
 
 const PatientOverview: React.FC = () => {
   const { id: folder = "" } = useParams();
+  const navigate = useNavigate();
   const { t } = useTranslation();
   const { doctors, diagnoses, addDoctor, addDiagnosis } = useContext(AppConfigContext);
 
@@ -63,7 +72,18 @@ const PatientOverview: React.FC = () => {
     patientCard: "",
     folder: "",
     appointments: [],
+    statusId: 1,
+    statusName: "Активний",
   });
+  
+  // Status state
+  const [patientStatuses, setPatientStatuses] = useState<patientsApi.PatientStatus[]>([]);
+  
+  // Rename modal state
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renameForm, setRenameForm] = useState({ surname: '', name: '', birthdate: '' });
+  const [renameLoading, setRenameLoading] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
 
   const [shownTabs, setShownTabs] = useState<configApi.TabEntry[]>(configApi.getDefaultTabs());
   const [currentAppointment, setCurrentAppointment] = useState<string>("");
@@ -81,6 +101,15 @@ const PatientOverview: React.FC = () => {
     diagnosis: "",
     notes: "",
   });
+
+  // Load statuses on mount
+  useEffect(() => {
+    const loadStatuses = async () => {
+      const statuses = await patientsApi.getPatientStatuses();
+      setPatientStatuses(statuses);
+    };
+    loadStatuses();
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
@@ -268,6 +297,86 @@ const PatientOverview: React.FC = () => {
     }
   };
 
+  // Handle status change
+  const handleStatusChange = async (statusId: number) => {
+    try {
+      await patientsApi.updatePatientStatus(folder, statusId);
+      const status = patientStatuses.find(s => s.id === statusId);
+      setPatientMeta(prev => ({ 
+        ...prev, 
+        statusId, 
+        statusName: status?.name || 'Невідомий' 
+      }));
+      message.success('Статус оновлено');
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      message.error('Помилка оновлення статусу');
+    }
+  };
+
+  // Open rename modal
+  const handleOpenRenameModal = () => {
+    setRenameForm({
+      surname: surname,
+      name: name,
+      birthdate: dob,
+    });
+    setRenameError(null);
+    setRenameModalVisible(true);
+  };
+
+  // Handle rename submit
+  const handleRenameSubmit = async () => {
+    const { surname: newSurname, name: newName, birthdate: newBirthdate } = renameForm;
+    
+    if (!newSurname.trim() || !newName.trim() || !newBirthdate.trim()) {
+      setRenameError('Всі поля обов\'язкові');
+      return;
+    }
+    
+    const newFolder = patientsApi.buildPatientFolder(newSurname.trim(), newName.trim(), newBirthdate);
+    
+    // Check if the name is the same
+    if (newFolder === folder) {
+      setRenameModalVisible(false);
+      return;
+    }
+    
+    // Check if new folder already exists
+    const exists = await patientsApi.checkPatientExists(newFolder);
+    if (exists) {
+      setRenameError('Пацієнт з таким іменем вже існує');
+      return;
+    }
+    
+    setRenameLoading(true);
+    setRenameError(null);
+    
+    try {
+      const result = await patientsApi.renamePatient(
+        folder,
+        newFolder,
+        newSurname.trim(),
+        newName.trim(),
+        newBirthdate
+      );
+      
+      if (result.success) {
+        message.success('Пацієнта перейменовано');
+        setRenameModalVisible(false);
+        // Navigate to the new URL
+        navigate(`/patients/${newFolder}`, { replace: true });
+      } else {
+        setRenameError(result.error || 'Помилка перейменування');
+      }
+    } catch (error) {
+      console.error('Failed to rename patient:', error);
+      setRenameError('Помилка перейменування пацієнта');
+    } finally {
+      setRenameLoading(false);
+    }
+  };
+
   const updateAppointmentField = async (patch: Partial<typeof currentAppointmentForm>) => {
     const newForm = { ...currentAppointmentForm, ...patch };
     setCurrentAppointmentForm(newForm);
@@ -409,19 +518,46 @@ const PatientOverview: React.FC = () => {
                   </Tooltip>
                 </div>
                 
-                <Descriptions column={1} size="small" style={{ marginBottom: 8 }}>
-                  <Descriptions.Item label="Дата народження">
+                <Descriptions column={1} size="small" className="patient-header-descriptions" style={{ marginBottom: 4 }}>
+                  <Descriptions.Item label="Дата народження" style={{ paddingBottom: 0 }}>
                     {fmt(dob)}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Статус картки">
+                    {(() => {
+                      const isActive = patientMeta.statusId === 1;
+                      const statusMenuItems: MenuProps['items'] = patientStatuses
+                        .filter(status => status.id !== patientMeta.statusId)
+                        .map(status => ({
+                          key: status.id.toString(),
+                          label: status.name,
+                          onClick: () => handleStatusChange(status.id),
+                        }));
+
+                      return (
+                        <Dropdown 
+                          menu={{ items: statusMenuItems }} 
+                          trigger={["click"]}
+                          disabled={statusMenuItems.length === 0}
+                        >
+                          <Tag 
+                            color={isActive ? "green" : "default"} 
+                            style={{ cursor: 'pointer', fontSize: 12 }}
+                          >
+                            {patientMeta.statusName}
+                          </Tag>
+                        </Dropdown>
+                      );
+                    })()}
                   </Descriptions.Item>
                 </Descriptions>
               </>
             }
             extra={
-              <Tooltip title="Відкрити папку пацієнта">
+              <Tooltip title="Редагувати">
                 <Button 
                   type="text" 
-                  icon={<FolderOpenOutlined />} 
-                  onClick={handleOpenPatientFolder}
+                  icon={<EditOutlined />} 
+                  onClick={handleOpenRenameModal}
                 />
               </Tooltip>
             }
@@ -573,6 +709,51 @@ const PatientOverview: React.FC = () => {
         defaultDoctor={patientMeta.doctor || ''}
         defaultDiagnosis={patientMeta.diagnosis || ''}
       />
+      
+      {/* Rename Modal */}
+      <Modal
+        title="Перейменувати пацієнта"
+        open={renameModalVisible}
+        onCancel={() => setRenameModalVisible(false)}
+        onOk={handleRenameSubmit}
+        okText="Зберегти"
+        cancelText="Скасувати"
+        confirmLoading={renameLoading}
+      >
+        <Form layout="vertical">
+          <Form.Item label="Прізвище" required>
+            <Input
+              value={renameForm.surname}
+              onChange={(e) => setRenameForm(prev => ({ ...prev, surname: e.target.value }))}
+              placeholder="Прізвище"
+            />
+          </Form.Item>
+          <Form.Item label="Ім'я" required>
+            <Input
+              value={renameForm.name}
+              onChange={(e) => setRenameForm(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Ім'я"
+            />
+          </Form.Item>
+          <Form.Item label="Дата народження" required>
+            <DatePicker
+              value={renameForm.birthdate ? dayjs(renameForm.birthdate) : null}
+              onChange={(date) => setRenameForm(prev => ({ 
+                ...prev, 
+                birthdate: date ? date.format('YYYY-MM-DD') : '' 
+              }))}
+              format="DD.MM.YYYY"
+              style={{ width: '100%' }}
+              placeholder="Оберіть дату"
+            />
+          </Form.Item>
+          {renameError && (
+            <div style={{ color: '#ff4d4f', marginTop: -16, marginBottom: 8 }}>
+              {renameError}
+            </div>
+          )}
+        </Form>
+      </Modal>
     </Layout>
   );
 };

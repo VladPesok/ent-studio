@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useContext } from "react";
-import { Table, Input, Button, Dropdown, theme as antTheme, MenuProps, DatePicker, Select, Space, Tag, Row, Col, Pagination, Modal, Progress, message } from "antd";
+import { Table, Input, Button, Dropdown, theme as antTheme, MenuProps, DatePicker, Select, Space, Tag, Row, Col, Pagination, Modal, Progress, message, Tooltip } from "antd";
 import {
   EllipsisOutlined,
   PlusOutlined,
@@ -33,6 +33,7 @@ interface ImportProgress {
 const PatientsList: React.FC = () => {
   const { doctors, diagnoses } = useContext(AppConfigContext);
   const [patients, setPatients] = useState<patientsApi.Patient[]>([]);
+  const [patientStatuses, setPatientStatuses] = useState<patientsApi.PatientStatus[]>([]);
 
   const [addOpen, setAddOpen] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
@@ -46,6 +47,28 @@ const PatientsList: React.FC = () => {
 
   const nav = useNavigate();
   const { token } = useToken();
+
+  // Load patient statuses
+  useEffect(() => {
+    const loadStatuses = async () => {
+      const statuses = await patientsApi.getPatientStatuses();
+      setPatientStatuses(statuses);
+    };
+    loadStatuses();
+  }, []);
+
+  // Handle status change
+  const handleStatusChange = async (folder: string, statusId: number, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent row click
+    try {
+      await patientsApi.updatePatientStatus(folder, statusId);
+      message.success('Статус пацієнта оновлено');
+      reloadPatients();
+    } catch (error) {
+      console.error('Failed to update status:', error);
+      message.error('Помилка оновлення статусу');
+    }
+  };
 
   const updateTableState = async (newState: Partial<patientsApi.TableState>) => {
     const updatedState = { ...tableState, ...newState };
@@ -61,6 +84,7 @@ const PatientsList: React.FC = () => {
       appointmentDate: updatedState.filters.appointmentDate?.[0] || null,
       doctor: updatedState.filters.doctor || undefined,
       diagnosis: updatedState.filters.diagnosis || undefined,
+      status: updatedState.filters.status || undefined,
       sortField: updatedState.sorter.field || undefined,
       sortOrder: updatedState.sorter.order || undefined,
     };
@@ -193,6 +217,45 @@ const PatientsList: React.FC = () => {
     onFilter: () => true
   });
 
+  const getStatusSelectProps = () => ({
+    filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: FilterDropdownProps) => (
+      <div style={{ padding: 8, width: 200 }}>
+        <Select
+          mode="multiple"
+          placeholder="Оберіть статус"
+          value={selectedKeys.length > 0 ? selectedKeys : []}
+          onChange={(values) => setSelectedKeys(values)}
+          style={{ marginBottom: 8, width: '100%' }}
+          options={patientStatuses.map(status => ({ label: status.name, value: status.id }))}
+          maxTagCount="responsive"
+        />
+        <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+          <Button
+            type="primary"
+            onClick={() => confirm()}
+            size="small"
+            style={{ width: 90 }}
+          >
+            Фільтр
+          </Button>
+          <Button
+            onClick={() => {
+              setSelectedKeys([]);
+              clearIndividualFilter('status');
+              if (clearFilters) clearFilters();
+            }}
+            size="small"
+            style={{ width: 90 }}
+          >
+            Скинути
+          </Button>
+        </Space>
+      </div>
+    ),
+    filteredValue: tableState.filters.status || null,
+    onFilter: () => true
+  });
+
   const reloadPatients = async () => {
     const apiFilters: patientsApi.PatientFilters = {
       page: tableState.pagination.current,
@@ -203,6 +266,7 @@ const PatientsList: React.FC = () => {
       appointmentDate: tableState.filters.appointmentDate?.[0] || null,
       doctor: tableState.filters.doctor || undefined,
       diagnosis: tableState.filters.diagnosis || undefined,
+      status: tableState.filters.status || undefined,
       sortField: tableState.sorter.field || undefined,
       sortOrder: tableState.sorter.order || undefined,
     };
@@ -288,6 +352,7 @@ const PatientsList: React.FC = () => {
     if (tableState.filters.appointmentDate) activeFilters.push('Дата прийому');
     if (tableState.filters.doctor && tableState.filters.doctor.length > 0) activeFilters.push(`Лікарі: ${tableState.filters.doctor.length}`);
     if (tableState.filters.diagnosis && tableState.filters.diagnosis.length > 0) activeFilters.push(`Діагноз: ${tableState.filters.diagnosis.length}`);
+    if (tableState.filters.status && tableState.filters.status.length > 0) activeFilters.push(`Статус: ${tableState.filters.status.length}`);
     return activeFilters;
   };
 
@@ -295,7 +360,8 @@ const PatientsList: React.FC = () => {
   const hasActiveFilters = () => {
     return !!(tableState.search || tableState.filters.name?.[0] || tableState.filters.bithdate || 
               tableState.filters.appointmentDate || (tableState.filters.doctor && tableState.filters.doctor.length > 0) || 
-              (tableState.filters.diagnosis && tableState.filters.diagnosis.length > 0) || tableState.sorter.field);
+              (tableState.filters.diagnosis && tableState.filters.diagnosis.length > 0) ||
+              (tableState.filters.status && tableState.filters.status.length > 0) || tableState.sorter.field);
   };
 
   const data = useMemo(() => {
@@ -356,17 +422,53 @@ const PatientsList: React.FC = () => {
       ...getColumnSearchProps('diagnosis', "Основний діагноз"),
     },
     {
+      title: "Статус",
+      dataIndex: "statusName",
+      key: "status",
+      width: 140,
+      sorter: true,
+      render: (statusName, r) => {
+        const isActive = r.statusId === 1;
+        const statusMenuItems: MenuProps['items'] = patientStatuses
+          .filter(status => status.id !== r.statusId)
+          .map(status => ({
+            key: status.id.toString(),
+            label: status.name,
+            onClick: (info: { domEvent: React.MouseEvent }) => handleStatusChange(r.folder, status.id, info.domEvent),
+          }));
+
+        return (
+          <Dropdown 
+            menu={{ items: statusMenuItems }} 
+            trigger={["click"]}
+            disabled={statusMenuItems.length === 0}
+          >
+            <Tag 
+              color={isActive ? "green" : "default"} 
+              style={{ cursor: 'pointer' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {statusName}
+            </Tag>
+          </Dropdown>
+        );
+      },
+      ...getStatusSelectProps(),
+    },
+    {
       title: "",
-      key: "open",
+      key: "actions",
       width: 50,
       render: (_, r) => (
-        <FolderOpenOutlined
-          onClick={(e) => {
-            e.stopPropagation();
-            patientsApi.openPatientFolderInFs(r.folder);
-          }}
-          style={{ cursor: "pointer", fontSize: 18 }}
-        />
+        <Tooltip title="Відкрити папку">
+          <FolderOpenOutlined
+            onClick={(e) => {
+              e.stopPropagation();
+              patientsApi.openPatientFolderInFs(r.folder);
+            }}
+            style={{ cursor: "pointer", fontSize: 16 }}
+          />
+        </Tooltip>
       ),
     },
   ];

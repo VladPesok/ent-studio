@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm';
+import { ipcMain } from 'electron';
 import { getDb } from '../connection';
 import { sessionData } from '../models';
 
@@ -57,3 +58,21 @@ export function clearAllSessionData(): void {
   db.delete(sessionData).run();
 }
 
+/**
+ * Setup IPC handlers for session operations
+ */
+export function setupSessionIpcHandlers(): void {
+  ipcMain.handle("db:session:get", async (_e, key: string) => {
+    return getSessionData(key);
+  });
+
+  ipcMain.handle("db:session:getAll", async () => {
+    return {
+      currentDoctor: getSessionData('currentDoctor') || null,
+    };
+  });
+
+  ipcMain.handle("db:session:set", async (_e, key: string, value: any) => {
+    setSessionData(key, value);
+  });
+}

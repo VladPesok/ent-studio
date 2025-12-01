@@ -1,4 +1,5 @@
 import { eq, and } from 'drizzle-orm';
+import { ipcMain } from 'electron';
 import { getDb } from '../connection';
 import { appointments, appointmentDoctors, diagnoses, doctors, patients } from '../models';
 import { getOrCreateDoctor } from './doctorDao';
@@ -140,3 +141,15 @@ export function updateAppointmentData(
   }
 }
 
+/**
+ * Setup IPC handlers for appointment operations
+ */
+export function setupAppointmentIpcHandlers(): void {
+  ipcMain.handle("db:appointments:get", async (_e, folder: string, date: string) => {
+    return getAppointmentData(folder, date);
+  });
+
+  ipcMain.handle("db:appointments:update", async (_e, folder: string, date: string, data: any) => {
+    updateAppointmentData(folder, date, data);
+  });
+}

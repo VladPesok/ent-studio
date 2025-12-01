@@ -1,6 +1,7 @@
 import { eq, and, desc } from 'drizzle-orm';
+import { ipcMain } from 'electron';
 import { getDb } from '../connection';
-import { patientTests, patients, appointments } from '../models';
+import { patientTests, patients, appointments, testTemplates } from '../models';
 
 /**
  * Get all patient tests for a specific folder and appointment
@@ -75,6 +76,37 @@ export function getPatientTests(folderPath: string, appointmentDate?: string) {
 }
 
 /**
+ * Ensure test template exists in DB (sync from JSON file data)
+ * Returns the DB template ID
+ */
+function ensureTestTemplateInDb(testData: any): number {
+  const db = getDb();
+  const testName = testData.name || 'Unknown Test';
+  const testType = testData.testType || 'questionnaire';
+  
+  // Check if template with same name exists
+  const existing = db
+    .select({ id: testTemplates.id })
+    .from(testTemplates)
+    .where(eq(testTemplates.name, testName))
+    .get();
+  
+  if (existing) {
+    return existing.id;
+  }
+  
+  // Create new template in DB
+  const result = db.insert(testTemplates).values({
+    name: testName,
+    testType: testType,
+    description: testData.description || '',
+    templateData: JSON.stringify(testData.testData || {}),
+  }).run();
+  
+  return Number(result.lastInsertRowid);
+}
+
+/**
  * Create a new patient test
  */
 export function createPatientTest(
@@ -113,6 +145,9 @@ export function createPatientTest(
 
   const now = new Date().toISOString();
   
+  // Ensure test template exists in DB (sync from JSON)
+  const dbTemplateId = ensureTestTemplateInDb(testData);
+  
   // Prepare test data with progress
   const fullTestData = {
     testData: {
@@ -130,11 +165,10 @@ export function createPatientTest(
     },
   };
 
-  // Insert patient test
   const result = db.insert(patientTests).values({
     patientId: patient.id,
     appointmentId,
-    testTemplateId: parseInt(testTemplateId),
+    testTemplateId: dbTemplateId,
     testName: testData.name,
     testType: testData.testType || 'questionnaire',
     testData: JSON.stringify(fullTestData),
@@ -268,3 +302,43 @@ export function deletePatientTest(folderPath: string, patientTestId: string) {
   return { success: true };
 }
 
+/**
+ * Setup IPC handlers for patient test operations
+ */
+export function setupPatientTestIpcHandlers(): void {
+  ipcMain.handle("db:patientTests:getAll", async (_e, folder: string, currentAppointment?: string) => {
+    try {
+      return getPatientTests(folder, currentAppointment);
+    } catch (error) {
+      console.error('Error loading patient tests:', error);
+      return [];
+    }
+  });
+
+  ipcMain.handle("db:patientTests:create", async (_e, folder: string, currentAppointment: string | undefined, testId: string, testData: any) => {
+    try {
+      return createPatientTest(folder, currentAppointment, testId, testData);
+    } catch (error) {
+      console.error('Error creating patient test:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle("db:patientTests:update", async (_e, folder: string, currentAppointment: string | undefined, patientTestId: string, progressData: any) => {
+    try {
+      return updatePatientTest(folder, currentAppointment, patientTestId, progressData);
+    } catch (error) {
+      console.error('Error updating patient test:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle("db:patientTests:delete", async (_e, folder: string, currentAppointment: string | undefined, patientTestId: string) => {
+    try {
+      return deletePatientTest(folder, patientTestId);
+    } catch (error) {
+      console.error('Error deleting patient test:', error);
+      throw error;
+    }
+  });
+}

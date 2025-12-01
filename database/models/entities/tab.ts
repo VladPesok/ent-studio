@@ -6,6 +6,8 @@ export const tabs = sqliteTable('tabs', {
   name: text('name').notNull(),
   folder: text('folder').notNull().unique(),
   displayOrder: integer('display_order').notNull().default(0),
+  isVisible: integer('is_visible', { mode: 'boolean' }).notNull().default(true),
+  isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
 });
 

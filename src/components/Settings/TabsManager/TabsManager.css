@@ -1,0 +1,12 @@
+.tab-list-item {
+  padding: 8px 0 !important;
+}
+
+.tab-list-item.tab-hidden {
+  background-color: #fafafa;
+}
+
+.tab-list-item .ant-list-item-meta-title {
+  margin-bottom: 0 !important;
+}
+

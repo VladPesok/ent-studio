@@ -13,6 +13,7 @@ import PatientsList    from "./components/PatientsList/PatientsList";
 import PatientOverview from "./components/PatientOverview/PatientOverview";
 import Settings        from "./components/Settings/Settings";
 import TestConstructor from "./components/TestConstructor/TestConstructor";
+import Dictionaries    from "./components/Dictionaries/Dictionaries";
 
 import { AppConfigProvider, AppConfigContext } from "./holders/AppConfig";
 import AppHeader from "./wrappers/Header/Header";
@@ -61,6 +62,7 @@ const AppShell: React.FC = () => {
               />
               <Route path="/patients/:id" element={<PatientOverview />} />
               <Route path="/tests"         element={<TestConstructor />} />
+              <Route path="/dictionaries"  element={<Dictionaries />} />
               <Route path="/settings"      element={<Settings />} />
               <Route
                 path="*"

@@ -12,6 +12,8 @@ import {
   createPatientTest,
   setSetting,
   updateTabs,
+  getAllPatientRoots,
+  getDefaultPatientsRoot,
 } from './dao';
 
 interface MigrationProgress {
@@ -56,6 +58,26 @@ export const needsMigration = async (): Promise<boolean> => {
     await fs.access(appConfigPath);
     return true; // Old config exists, needs migration
   } catch {
+    // No app.config, but check if there are patient folders with old config files
+    const allPatientRoots = getAllPatientRoots();
+    
+    for (const patientsRoot of allPatientRoots) {
+      try {
+        const dirs = await fs.readdir(patientsRoot, { withFileTypes: true });
+        for (const dir of dirs.filter(d => d.isDirectory())) {
+          const patientConfigPath = path.join(patientsRoot, dir.name, 'patient.config');
+          try {
+            await fs.access(patientConfigPath);
+            return true; // Found old patient config, needs migration
+          } catch {
+            // No config for this patient
+          }
+        }
+      } catch {
+        // Directory doesn't exist
+      }
+    }
+    
     return false; // Fresh install
   }
 };
@@ -97,25 +119,34 @@ export const runMigration = async (
 
   try {
     const appDataFolder = path.join(app.getPath("userData"), "appData");
-    const patientsRoot = path.join(appDataFolder, "patients");
     const settingsRoot = path.join(appDataFolder, "settings");
     const appConfigPath = path.join(settingsRoot, "app.config");
+    
+    // Get all patient storage locations
+    const allPatientRoots = getAllPatientRoots();
+    console.log('Scanning patient roots:', allPatientRoots);
 
     // Step 1: Migrate app config
     onProgress?.({ step: 'Migrating settings', current: 1, total: 5, percentage: 20 });
     await migrateAppConfig(appConfigPath, result);
 
-    // Step 2: Migrate patients
+    // Step 2: Migrate patients from all storage locations
     onProgress?.({ step: 'Migrating patients', current: 2, total: 5, percentage: 40 });
-    await migratePatients(patientsRoot, result);
+    for (const patientsRoot of allPatientRoots) {
+      await migratePatients(patientsRoot, result);
+    }
 
-    // Step 3: Migrate appointments
+    // Step 3: Migrate appointments from all storage locations
     onProgress?.({ step: 'Migrating appointments', current: 3, total: 5, percentage: 60 });
-    await migrateAppointments(patientsRoot, result);
+    for (const patientsRoot of allPatientRoots) {
+      await migrateAppointments(patientsRoot, result);
+    }
 
-    // Step 4: Migrate tests
+    // Step 4: Migrate tests from all storage locations
     onProgress?.({ step: 'Migrating tests', current: 4, total: 5, percentage: 80 });
-    await migrateTests(patientsRoot, result);
+    for (const patientsRoot of allPatientRoots) {
+      await migrateTests(patientsRoot, result);
+    }
 
     // Step 5: Finalize
     onProgress?.({ step: 'Finalizing migration', current: 5, total: 5, percentage: 100 });
@@ -180,6 +211,15 @@ const migrateAppConfig = async (configPath: string, result: MigrationResult): Pr
 
 const migratePatients = async (patientsRoot: string, result: MigrationResult): Promise<void> => {
   try {
+    // Check if directory exists
+    try {
+      await fs.access(patientsRoot);
+    } catch {
+      console.log(`Patients root doesn't exist, skipping: ${patientsRoot}`);
+      return;
+    }
+    
+    console.log(`Scanning patients in: ${patientsRoot}`);
     const dirs = await fs.readdir(patientsRoot, { withFileTypes: true });
     const patientFolders = dirs.filter(d => d.isDirectory());
 
@@ -224,7 +264,7 @@ const migratePatients = async (patientsRoot: string, result: MigrationResult): P
       }
     }
 
-    console.log(`Migrated ${result.stats.patients} patients`);
+    console.log(`Migrated ${result.stats.patients} patients from ${patientsRoot}`);
   } catch (error) {
     console.error('Error migrating patients:', error);
     result.errors.push(`Patients: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -236,6 +276,13 @@ const migratePatients = async (patientsRoot: string, result: MigrationResult): P
  */
 const migrateAppointments = async (patientsRoot: string, result: MigrationResult): Promise<void> => {
   try {
+    // Check if directory exists
+    try {
+      await fs.access(patientsRoot);
+    } catch {
+      return; // Skip if doesn't exist
+    }
+    
     const patientFolders = await fs.readdir(patientsRoot, { withFileTypes: true });
 
     for (const patientFolder of patientFolders.filter(d => d.isDirectory())) {
@@ -294,6 +341,13 @@ const migrateTests = async (patientsRoot: string, result: MigrationResult): Prom
   const db = getRawDb();
   
   try {
+    // Check if directory exists
+    try {
+      await fs.access(patientsRoot);
+    } catch {
+      return; // Skip if doesn't exist
+    }
+    
     const patientFolders = await fs.readdir(patientsRoot, { withFileTypes: true });
 
     for (const patientFolder of patientFolders.filter(d => d.isDirectory())) {

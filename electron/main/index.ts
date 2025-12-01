@@ -5,10 +5,11 @@ import path from 'node:path'
 import os from 'node:os'
 
 import { setAutoUpdater } from './autoUpdater'
-import { setFsOperations } from "./fs"
+import { setFsOperations } from "../../filesystem/fs"
 import { initializeDatabase, closeDatabase } from '../../database/connection'
 import { runMigrations } from '../../database/migrate'
 import { needsMigration, createBackup, runMigration } from '../../database/oldConfigMigration'
+import { setupAllDatabaseIpcHandlers } from '../../database/dao'
 
 const require = createRequire(import.meta.url)
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -61,7 +62,11 @@ async function createWindow() {
     console.log('Initializing database...');
     initializeDatabase();
     
+    // Run migrations first to ensure schema is up to date
     await runMigrations();
+    
+    // Setup database IPC handlers after migrations
+    setupAllDatabaseIpcHandlers();
     
     // Check if old config file migration is needed
     if (await needsMigration()) {
