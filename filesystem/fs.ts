@@ -164,6 +164,95 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
     }
   });
 
+  // Merge appointment folders from source patient to target patient
+  ipcMain.handle("fs:patient:mergeAppointments", async (_e, sourceFolder: string, targetFolder: string, appointmentDates: string[]) => {
+    try {
+      const sourcePath = await resolvePatientFolderPath(sourceFolder);
+      const targetPath = await resolvePatientFolderPath(targetFolder);
+      
+      if (!sourcePath) {
+        return { success: false, error: 'Папку пацієнта-джерела не знайдено' };
+      }
+      
+      if (!targetPath) {
+        return { success: false, error: 'Папку цільового пацієнта не знайдено' };
+      }
+
+      const copiedDates: string[] = [];
+      const mergedDates: string[] = [];
+
+      for (const date of appointmentDates) {
+        const sourceApptPath = path.join(sourcePath, date);
+        const targetApptPath = path.join(targetPath, date);
+        
+        // Check if source appointment folder exists
+        if (!(await exists(sourceApptPath))) {
+          continue;
+        }
+
+        // Check if target appointment folder exists
+        if (await exists(targetApptPath)) {
+          // Merge files into existing folder
+          const sourceEntries = await fs.readdir(sourceApptPath, { withFileTypes: true });
+          
+          for (const entry of sourceEntries) {
+            const sourceItemPath = path.join(sourceApptPath, entry.name);
+            const targetItemPath = path.join(targetApptPath, entry.name);
+            
+            if (entry.isDirectory()) {
+              // Merge directory contents
+              await ensureDir(targetItemPath);
+              const subEntries = await fs.readdir(sourceItemPath);
+              for (const subEntry of subEntries) {
+                const sourceFilePath = path.join(sourceItemPath, subEntry);
+                const targetFilePath = path.join(targetItemPath, subEntry);
+                // Only copy if doesn't exist in target
+                if (!(await exists(targetFilePath))) {
+                  await fs.cp(sourceFilePath, targetFilePath, { recursive: true });
+                }
+              }
+            } else {
+              // Copy file if doesn't exist
+              if (!(await exists(targetItemPath))) {
+                await fs.cp(sourceItemPath, targetItemPath);
+              }
+            }
+          }
+          mergedDates.push(date);
+        } else {
+          // Copy entire folder
+          await fs.cp(sourceApptPath, targetApptPath, { recursive: true });
+          copiedDates.push(date);
+        }
+      }
+
+      return { success: true, copiedDates, mergedDates };
+    } catch (error) {
+      console.error('Failed to merge patient appointments:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Помилка об\'єднання папок' };
+    }
+  });
+
+  // Delete patient folder
+  ipcMain.handle("fs:patient:deleteFolder", async (_e, folder: string) => {
+    try {
+      const folderPath = await resolvePatientFolderPath(folder);
+      
+      if (!folderPath) {
+        // Folder doesn't exist, consider it a success
+        return { success: true };
+      }
+
+      // Delete the folder recursively
+      await fs.rm(folderPath, { recursive: true, force: true });
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to delete patient folder:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Помилка видалення папки' };
+    }
+  });
+
   // ==================== Video Operations ====================
 
   ipcMain.handle("fs:patient:counts", async (_e, folder: string) => {

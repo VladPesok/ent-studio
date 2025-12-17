@@ -6,8 +6,12 @@ export const patientStatuses = sqliteTable('patient_statuses', {
   name: text('name').notNull().unique(),
   // isSystem: true means it cannot be deleted or renamed (Active, Archived)
   isSystem: integer('is_system', { mode: 'boolean' }).notNull().default(false),
+  // isDefault: true means this status is assigned to new patients
+  isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
+  // Soft delete timestamp
+  deletedAt: text('deleted_at'),
 });
 
 export type PatientStatus = typeof patientStatuses.$inferSelect;

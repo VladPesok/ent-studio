@@ -24,6 +24,7 @@ import {
   VideoCameraOutlined,
   AudioOutlined,
   CalendarOutlined,
+  MergeCellsOutlined,
   FolderOpenOutlined,
   PlusOutlined,
   ExperimentOutlined,
@@ -38,6 +39,7 @@ import CustomTab from "./CustomTab/CustomTab";
 import TestTab from "./TestTab/TestTab";
 import CreatableSelect from "../../common/input/CreatableSelect";
 import AddAppointmentModal from "./AddAppointmentModal/AddAppointmentModal";
+import MergePatientModal from "./MergePatientModal/MergePatientModal";
 import { AppConfigContext } from "../../holders/AppConfig";
 
 import * as patientsApi from "../../helpers/patientsApi";
@@ -84,6 +86,9 @@ const PatientOverview: React.FC = () => {
   const [renameForm, setRenameForm] = useState({ surname: '', name: '', birthdate: '' });
   const [renameLoading, setRenameLoading] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+  
+  // Merge modal state
+  const [mergeModalVisible, setMergeModalVisible] = useState(false);
 
   const [shownTabs, setShownTabs] = useState<configApi.TabEntry[]>(configApi.getDefaultTabs());
   const [currentAppointment, setCurrentAppointment] = useState<string>("");
@@ -553,13 +558,22 @@ const PatientOverview: React.FC = () => {
               </>
             }
             extra={
-              <Tooltip title="Редагувати">
-                <Button 
-                  type="text" 
-                  icon={<EditOutlined />} 
-                  onClick={handleOpenRenameModal}
-                />
-              </Tooltip>
+              <Space direction="vertical" size="small">
+                <Tooltip title="Редагувати">
+                  <Button 
+                    type="text" 
+                    icon={<EditOutlined />} 
+                    onClick={handleOpenRenameModal}
+                  />
+                </Tooltip>
+                <Tooltip title="Об'єднати пацієнтів">
+                  <Button 
+                    type="text" 
+                    icon={<MergeCellsOutlined />} 
+                    onClick={() => setMergeModalVisible(true)}
+                  />
+                </Tooltip>
+              </Space>
             }
           >
             <Form layout="vertical">
@@ -633,15 +647,6 @@ const PatientOverview: React.FC = () => {
               loading={currentAppointmentLoading}
               title={`Прийом ${fmt(currentAppointment)}`}
               style={{ marginTop: 16 }}
-              extra={
-                <Tooltip title="Відкрити папку прийому">
-                  <Button 
-                    type="text" 
-                    icon={<FolderOpenOutlined />} 
-                    onClick={handleOpenAppointmentFolder}
-                  />
-                </Tooltip>
-              }
             >
               <Form layout="vertical">
                 <Form.Item label="Лікарі на прийомі">
@@ -754,6 +759,30 @@ const PatientOverview: React.FC = () => {
           )}
         </Form>
       </Modal>
+      
+      {/* Merge Patient Modal */}
+      <MergePatientModal
+        visible={mergeModalVisible}
+        currentPatientFolder={folder}
+        onCancel={() => setMergeModalVisible(false)}
+        onSuccess={() => {
+          setMergeModalVisible(false);
+          // Reload patient data after successful merge
+          const loadData = async () => {
+            setPatientInfoLoading(true);
+            try {
+              const meta = await patientsApi.getPatientMeta(folder);
+              setPatientMeta(meta);
+              if (meta.appointments?.[0]?.date) {
+                setCurrentAppointment(meta.appointments[0].date);
+              }
+            } finally {
+              setPatientInfoLoading(false);
+            }
+          };
+          loadData();
+        }}
+      />
     </Layout>
   );
 };

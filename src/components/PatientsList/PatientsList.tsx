@@ -74,22 +74,10 @@ const PatientsList: React.FC = () => {
     const updatedState = { ...tableState, ...newState };
     setTableState(updatedState);
 
-    // Convert table state to API filters
-    const apiFilters: patientsApi.PatientFilters = {
-      page: updatedState.pagination.current,
-      pageSize: updatedState.pagination.pageSize,
-      search: updatedState.search || undefined,
-      name: updatedState.filters.name?.[0] || undefined,
-      bithdate: updatedState.filters.bithdate?.[0] || null,
-      appointmentDate: updatedState.filters.appointmentDate?.[0] || null,
-      doctor: updatedState.filters.doctor || undefined,
-      diagnosis: updatedState.filters.diagnosis || undefined,
-      status: updatedState.filters.status || undefined,
-      sortField: updatedState.sorter.field || undefined,
-      sortOrder: updatedState.sorter.order || undefined,
-    };
-
-    const result = await patientsApi.getPatients(apiFilters);
+    // Convert table state to database filters
+    const dbFilters = patientsApi.tableStateToDbFilters(updatedState);
+    
+    const result = await patientsApi.getPatients(dbFilters);
     setPatients(result.data);
     setTableState(prev => ({
       ...prev,
@@ -257,21 +245,9 @@ const PatientsList: React.FC = () => {
   });
 
   const reloadPatients = async () => {
-    const apiFilters: patientsApi.PatientFilters = {
-      page: tableState.pagination.current,
-      pageSize: tableState.pagination.pageSize,
-      search: tableState.search || undefined,
-      name: tableState.filters.name?.[0] || undefined,
-      bithdate: tableState.filters.bithdate?.[0] || null,
-      appointmentDate: tableState.filters.appointmentDate?.[0] || null,
-      doctor: tableState.filters.doctor || undefined,
-      diagnosis: tableState.filters.diagnosis || undefined,
-      status: tableState.filters.status || undefined,
-      sortField: tableState.sorter.field || undefined,
-      sortOrder: tableState.sorter.order || undefined,
-    };
-
-    const result = await patientsApi.getPatients(apiFilters);
+    const dbFilters = patientsApi.tableStateToDbFilters(tableState);
+    
+    const result = await patientsApi.getPatients(dbFilters);
     setPatients(result.data);
     setTableState(prev => ({
       ...prev,

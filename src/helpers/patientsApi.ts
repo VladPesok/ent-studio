@@ -3,9 +3,11 @@ export interface Patient {
   birthdate: string;
   latestAppointmentDate: string;
   doctor: string;
+  doctorId?: number | null;
   diagnosis: string;
+  diagnosisId?: number | null;
   patientCard: string;
-  folder: string; // Keep for backward compatibility
+  folder: string;
   statusId: number;
   statusName: string;
 }
@@ -35,20 +37,24 @@ export interface Patient extends PatientConfig {
   statusName: string;
 }
 
+// Filters sent to database
 export interface PatientFilters {
   search?: string;
   name?: string;
-  bithdate?: [any, any] | null;
-  appointmentDate?: [any, any] | null;
-  doctor?: string[];
-  diagnosis?: string[];
-  status?: number[];
+  birthdateFrom?: string;
+  birthdateTo?: string;
+  appointmentDateFrom?: string;
+  appointmentDateTo?: string;
+  doctorNames?: string[];
+  diagnosisText?: string;
+  statusIds?: number[];
   sortField?: string;
   sortOrder?: 'ascend' | 'descend';
   page?: number;
   pageSize?: number;
 }
 
+// Table state from UI (with dayjs objects and string arrays)
 export interface TableState {
   pagination: {
     current: number;
@@ -79,156 +85,75 @@ export interface PaginatedResult<T> {
   pageSize: number;
 }
 
-export const getPatients = async (filters?: PatientFilters): Promise<PaginatedResult<Patient>> => {
-  // Get patients from database
-  const allPatients = await window.ipcRenderer.invoke("db:patients:getAll");
-
-  let filteredPatients = allPatients;
-
-  if (filters) {
-    filteredPatients = allPatients.filter((patient: Patient) => {
-      // Search filter (legacy search input)
-      if (filters.search) {
-        const term = filters.search.trim().toLowerCase();
-        const matchesSearch = patient.name.toLowerCase().includes(term);
-        if (!matchesSearch) return false;
-      }
-      
-      // Name filter (from column filter)
-      if (filters.name) {
-        const term = filters.name.toLowerCase();
-        const fullName = patient.name.toLowerCase();
-        if (!fullName.includes(term)) return false;
-      }
-      
-      // Date of birth filter
-      if (filters.bithdate && Array.isArray(filters.bithdate)) {
-        const [start, end] = filters.bithdate;
-        if (start || end) {
-          const dobString = patient.birthdate;
-          if (!dobString) return false;
-          
-          // Parse birthdate in YYYY-MM-DD format
-          const [year, month, day] = dobString.split('-');
-          if (!day || !month || !year) return false;
-          
-          const dobDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-          
-          if (start && !end) {
-            if (dobDate < start.startOf('day').toDate()) return false;
-          } else if (!start && end) {
-            if (dobDate > end.endOf('day').toDate()) return false;
-          } else if (start && end) {
-            if (dobDate < start.startOf('day').toDate() || dobDate > end.endOf('day').toDate()) return false;
-          }
-        }
-      }
-      
-      // Visit date filter
-      if (filters.appointmentDate && Array.isArray(filters.appointmentDate)) {
-        const [start, end] = filters.appointmentDate;
-        if (start || end) {
-          const visitDate = new Date(patient.latestAppointmentDate);
-          
-          if (start && !end) {
-            if (visitDate < start.startOf('day').toDate()) return false;
-          } else if (!start && end) {
-            if (visitDate > end.endOf('day').toDate()) return false;
-          } else if (start && end) {
-            if (visitDate < start.startOf('day').toDate() || visitDate > end.endOf('day').toDate()) return false;
-          }
-        }
-      }
-      
-      // Doctor filter
-      if (filters.doctor && filters.doctor.length > 0) {
-        if (!filters.doctor.includes(patient.doctor)) return false;
-      }
-      
-      // Diagnosis filter
-      if (filters.diagnosis && filters.diagnosis.length > 0) {
-        if (!filters.diagnosis.includes(patient.diagnosis)) return false;
-      }
-      
-      // Status filter
-      if (filters.status && filters.status.length > 0) {
-        if (!filters.status.includes(patient.statusId)) return false;
-      }
-      
-      return true;
-    });
-  }
-  
-  // Apply sorting
-  if (filters?.sortField && filters?.sortOrder) {
-    filteredPatients.sort((a: Patient, b: Patient) => {
-      let valueA: any;
-      let valueB: any;
-      
-      let comparison: number;
-      
-      switch (filters.sortField) {
-        case 'name': // Patient name
-          valueA = a.name;
-          valueB = b.name;
-          comparison = String(valueA).localeCompare(String(valueB));
-          break;
-        case 'birthdate': // Date of birth
-          // Parse YYYY-MM-DD format explicitly
-          const [yearA, monthA, dayA] = a.birthdate.split('-').map(Number);
-          const [yearB, monthB, dayB] = b.birthdate.split('-').map(Number);
-
-          valueA = new Date(yearA, monthA - 1, dayA).getTime();
-          valueB = new Date(yearB, monthB - 1, dayB).getTime();
-
-          comparison = valueA - valueB;
-          break;
-        case 'doctor': // Doctor
-          valueA = a.doctor || '';
-          valueB = b.doctor || '';
-          comparison = String(valueA).localeCompare(String(valueB));
-          break;
-        case 'diagnosis': // Diagnosis
-          valueA = a.diagnosis || '';
-          valueB = b.diagnosis || '';
-          comparison = String(valueA).localeCompare(String(valueB));
-          break;
-        case 'status': // Status
-          valueA = a.statusName || '';
-          valueB = b.statusName || '';
-          comparison = String(valueA).localeCompare(String(valueB));
-          break;
-        case 'appointmentDate':
-        default:
-          // Parse YYYY-MM-DD format explicitly
-          const [yearA2, monthA2, dayA2] = a.latestAppointmentDate.split('-').map(Number);
-          const [yearB2, monthB2, dayB2] = b.latestAppointmentDate.split('-').map(Number);
-          valueA = new Date(yearA2, monthA2 - 1, dayA2).getTime();
-          valueB = new Date(yearB2, monthB2 - 1, dayB2).getTime();
-          comparison = valueA - valueB;
-      }
-      
-      return filters.sortOrder === 'ascend' ? comparison : -comparison;
-    });
-  } else {
-    // Default sorting by visit date (newest first)
-    filteredPatients.sort((a: Patient, b: Patient) => (a.latestAppointmentDate < b.latestAppointmentDate ? 1 : -1));
-  }
-  
-  // Apply pagination
-  const page = filters?.page || 1;
-  const pageSize = filters?.pageSize || 10;
-  const total = filteredPatients.length;
-  const startIndex = (page - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedData = filteredPatients.slice(startIndex, endIndex);
-  
-  return {
-    data: paginatedData,
-    total,
-    page,
-    pageSize
+/**
+ * Convert UI table state to database filter format
+ */
+export function tableStateToDbFilters(tableState: TableState): PatientFilters {
+  const filters: PatientFilters = {
+    page: tableState.pagination.current,
+    pageSize: tableState.pagination.pageSize,
   };
+
+  // Search
+  if (tableState.search) {
+    filters.search = tableState.search;
+  }
+
+  // Name filter
+  if (tableState.filters.name?.[0]) {
+    filters.name = tableState.filters.name[0];
+  }
+
+  // Birthdate range
+  if (tableState.filters.bithdate?.[0]) {
+    const [start, end] = tableState.filters.bithdate[0];
+    if (start) filters.birthdateFrom = start.format('YYYY-MM-DD');
+    if (end) filters.birthdateTo = end.format('YYYY-MM-DD');
+  }
+
+  // Appointment date range
+  if (tableState.filters.appointmentDate?.[0]) {
+    const [start, end] = tableState.filters.appointmentDate[0];
+    if (start) filters.appointmentDateFrom = start.format('YYYY-MM-DD');
+    if (end) filters.appointmentDateTo = end.format('YYYY-MM-DD');
+  }
+
+  // Doctor filter (by names directly)
+  if (tableState.filters.doctor?.length) {
+    filters.doctorNames = tableState.filters.doctor;
+  }
+
+  // Diagnosis filter (text search)
+  if (tableState.filters.diagnosis?.[0]) {
+    filters.diagnosisText = tableState.filters.diagnosis[0];
+  }
+
+  // Status filter
+  if (tableState.filters.status?.length) {
+    filters.statusIds = tableState.filters.status;
+  }
+
+  // Sorting
+  if (tableState.sorter.field) {
+    filters.sortField = tableState.sorter.field;
+    filters.sortOrder = tableState.sorter.order;
+  }
+
+  return filters;
+}
+
+/**
+ * Get patients with database-level filtering, sorting, and pagination
+ */
+export const getPatients = async (filters?: PatientFilters): Promise<PaginatedResult<Patient>> => {
+  return window.ipcRenderer.invoke("db:patients:getFiltered", filters);
+};
+
+/**
+ * Get all patients without filtering (for backward compatibility)
+ */
+export const getAllPatients = async (): Promise<Patient[]> => {
+  return window.ipcRenderer.invoke("db:patients:getAll");
 };
 
 // USB import - combines FS operations with DB creation
@@ -383,14 +308,42 @@ export interface PatientStatus {
   id: number;
   name: string;
   isSystem: boolean;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
 }
 
-export const getPatientStatuses = async (): Promise<PatientStatus[]> => {
-  return window.ipcRenderer.invoke("db:patientStatuses:getAll");
+export const getPatientStatuses = async (includeDeleted: boolean = true): Promise<PatientStatus[]> => {
+  return window.ipcRenderer.invoke("db:patientStatuses:getAll", includeDeleted);
 };
 
 export const updatePatientStatus = async (folder: string, statusId: number): Promise<void> => {
   await window.ipcRenderer.invoke("db:patients:updateStatus", folder, statusId);
+};
+
+export const createPatientStatusEntry = async (name: string): Promise<number> => {
+  return window.ipcRenderer.invoke("db:patientStatuses:create", name);
+};
+
+export const updatePatientStatusEntry = async (id: number, name: string): Promise<boolean> => {
+  return window.ipcRenderer.invoke("db:patientStatuses:update", id, name);
+};
+
+export const deletePatientStatusEntry = async (id: number): Promise<boolean> => {
+  return window.ipcRenderer.invoke("db:patientStatuses:delete", id);
+};
+
+export const restorePatientStatusEntry = async (id: number): Promise<boolean> => {
+  return window.ipcRenderer.invoke("db:patientStatuses:restore", id);
+};
+
+export const getDefaultPatientStatus = async (): Promise<PatientStatus | null> => {
+  return window.ipcRenderer.invoke("db:patientStatuses:getDefault");
+};
+
+export const setDefaultPatientStatus = async (id: number): Promise<boolean> => {
+  return window.ipcRenderer.invoke("db:patientStatuses:setDefault", id);
 };
 
 // Patient rename operations
@@ -418,4 +371,51 @@ export const renamePatient = async (
 
 export const buildPatientFolder = (surname: string, name: string, birthdate: string): string => {
   return `${surname}_${name}_${birthdate}`;
+};
+
+// Lightweight patient info for selects
+export interface PatientListItem {
+  id: number;
+  surname: string;
+  name: string;
+  birthdate: string;
+  folder: string;
+}
+
+// Get lightweight list of all patients (for select dropdowns)
+export const getAllPatientsLightweight = async (): Promise<PatientListItem[]> => {
+  return window.ipcRenderer.invoke("db:patients:getAllLightweight");
+};
+
+// Merge patients
+export interface MergeResult {
+  success: boolean;
+  error?: string;
+}
+
+export const mergePatients = async (sourceFolder: string, targetFolder: string): Promise<MergeResult> => {
+  try {
+    // 1. Get appointment dates from source patient
+    const sourceDates = await window.ipcRenderer.invoke("db:patients:getAppointmentDates", sourceFolder);
+    
+    // 2. Merge folders on filesystem (copy appointment folders)
+    const fsResult = await window.ipcRenderer.invoke("fs:patient:mergeAppointments", sourceFolder, targetFolder, sourceDates);
+    if (!fsResult.success) {
+      return { success: false, error: fsResult.error || 'Помилка копіювання файлів' };
+    }
+    
+    // 3. Merge appointments in database
+    const dbResult = await window.ipcRenderer.invoke("db:patients:mergeAppointments", sourceFolder, targetFolder);
+    
+    // 4. Delete source patient from database
+    await window.ipcRenderer.invoke("db:patients:deleteWithAppointments", sourceFolder);
+    
+    // 5. Delete source patient folder from filesystem
+    await window.ipcRenderer.invoke("fs:patient:deleteFolder", sourceFolder);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to merge patients:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Помилка об\'єднання пацієнтів' };
+  }
 };

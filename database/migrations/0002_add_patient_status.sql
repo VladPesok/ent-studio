@@ -9,9 +9,9 @@ CREATE TABLE IF NOT EXISTS `patient_statuses` (
 --> statement-breakpoint
 CREATE UNIQUE INDEX IF NOT EXISTS `patient_statuses_name_unique` ON `patient_statuses` (`name`);
 --> statement-breakpoint
-INSERT OR IGNORE INTO `patient_statuses` (`id`, `name`, `is_system`) VALUES (1, 'Активний', 1);
+INSERT OR IGNORE INTO `patient_statuses` (`id`, `name`, `is_system`) VALUES (1, 'Active', 1);
 --> statement-breakpoint
-INSERT OR IGNORE INTO `patient_statuses` (`id`, `name`, `is_system`) VALUES (2, 'Архівований', 1);
+INSERT OR IGNORE INTO `patient_statuses` (`id`, `name`, `is_system`) VALUES (2, 'Archived', 1);
 --> statement-breakpoint
 -- Add column without REFERENCES constraint (SQLite limitation)
 ALTER TABLE `patients` ADD `status_id` integer DEFAULT 1;

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Tabs, Table, Button, Modal, Input, Space, Tag, message, Tooltip, Typography } from 'antd';
-import { EditOutlined, DeleteOutlined, UndoOutlined, PlusOutlined } from '@ant-design/icons';
+import { Tabs, Table, Button, Modal, Input, Space, Tag, message, Tooltip, Typography, Radio } from 'antd';
+import { EditOutlined, DeleteOutlined, UndoOutlined, PlusOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { AppConfigContext } from '../../holders/AppConfig';
+import * as patientsApi from '../../helpers/patientsApi';
 import './Dictionaries.css';
 
 const { Title } = Typography;
@@ -15,17 +16,28 @@ interface DictionaryItem {
   deletedAt: string | null;
 }
 
-type DictionaryType = 'doctors' | 'diagnoses';
+interface PatientStatusItem {
+  id: number;
+  name: string;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+type DictionaryType = 'doctors' | 'diagnoses' | 'statuses';
 
 const Dictionaries: React.FC = () => {
   const { refreshDictionaries } = useContext(AppConfigContext);
   const [activeTab, setActiveTab] = useState<DictionaryType>('doctors');
   const [doctors, setDoctors] = useState<DictionaryItem[]>([]);
   const [diagnoses, setDiagnoses] = useState<DictionaryItem[]>([]);
+  const [statuses, setStatuses] = useState<PatientStatusItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<DictionaryItem | null>(null);
+  const [editingStatus, setEditingStatus] = useState<PatientStatusItem | null>(null);
   const [editName, setEditName] = useState('');
   const [newName, setNewName] = useState('');
 
@@ -33,12 +45,14 @@ const Dictionaries: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [doctorsData, diagnosesData] = await Promise.all([
+      const [doctorsData, diagnosesData, statusesData] = await Promise.all([
         window.ipcRenderer.invoke('db:dict:doctors:getAll', true),
         window.ipcRenderer.invoke('db:dict:diagnoses:getAll', true),
+        patientsApi.getPatientStatuses(),
       ]);
       setDoctors(doctorsData);
       setDiagnoses(diagnosesData);
+      setStatuses(statusesData);
     } catch (error) {
       console.error('Failed to load dictionaries:', error);
       message.error('Помилка завантаження словників');
@@ -64,23 +78,43 @@ const Dictionaries: React.FC = () => {
     });
   };
 
-  // Handle edit
+  // Handle edit for doctors/diagnoses
   const handleEdit = (item: DictionaryItem) => {
     setEditingItem(item);
+    setEditingStatus(null);
+    setEditName(item.name);
+    setEditModalVisible(true);
+  };
+
+  // Handle edit for statuses
+  const handleEditStatus = (item: PatientStatusItem) => {
+    setEditingStatus(item);
+    setEditingItem(null);
     setEditName(item.name);
     setEditModalVisible(true);
   };
 
   // Save edit
   const handleSaveEdit = async () => {
-    if (!editingItem || !editName.trim()) return;
+    if (!editName.trim()) return;
 
     try {
-      const handler = activeTab === 'doctors' ? 'db:dict:doctors:update' : 'db:dict:diagnoses:update';
-      await window.ipcRenderer.invoke(handler, editingItem.id, editName.trim());
+      if (editingStatus) {
+        // Editing a status
+        const success = await patientsApi.updatePatientStatusEntry(editingStatus.id, editName.trim());
+        if (!success) {
+          message.error('Не вдалося зберегти статус');
+          return;
+        }
+      } else if (editingItem) {
+        // Editing doctor/diagnosis
+        const handler = activeTab === 'doctors' ? 'db:dict:doctors:update' : 'db:dict:diagnoses:update';
+        await window.ipcRenderer.invoke(handler, editingItem.id, editName.trim());
+      }
       message.success('Збережено');
       setEditModalVisible(false);
       setEditingItem(null);
+      setEditingStatus(null);
       setEditName('');
       loadData();
       refreshDictionaries();
@@ -90,7 +124,7 @@ const Dictionaries: React.FC = () => {
     }
   };
 
-  // Handle soft delete
+  // Handle soft delete for doctors/diagnoses
   const handleDelete = async (item: DictionaryItem) => {
     try {
       const handler = activeTab === 'doctors' ? 'db:dict:doctors:delete' : 'db:dict:diagnoses:delete';
@@ -101,6 +135,58 @@ const Dictionaries: React.FC = () => {
     } catch (error) {
       console.error('Failed to delete:', error);
       message.error('Помилка видалення');
+    }
+  };
+
+  // Handle delete (archive) for statuses
+  const handleDeleteStatus = async (item: PatientStatusItem) => {
+    if (item.isDefault) {
+      message.error('Статус за замовчуванням не можна архівувати');
+      return;
+    }
+    try {
+      const success = await patientsApi.deletePatientStatusEntry(item.id);
+      if (!success) {
+        message.error('Не вдалося архівувати статус');
+        return;
+      }
+      message.success('Архівовано');
+      loadData();
+    } catch (error) {
+      console.error('Failed to archive status:', error);
+      message.error('Помилка архівування');
+    }
+  };
+
+  // Handle restore for statuses
+  const handleRestoreStatus = async (item: PatientStatusItem) => {
+    try {
+      const success = await patientsApi.restorePatientStatusEntry(item.id);
+      if (!success) {
+        message.error('Не вдалося відновити статус');
+        return;
+      }
+      message.success('Відновлено');
+      loadData();
+    } catch (error) {
+      console.error('Failed to restore status:', error);
+      message.error('Помилка відновлення');
+    }
+  };
+
+  // Handle setting default status
+  const handleSetDefaultStatus = async (id: number) => {
+    try {
+      const success = await patientsApi.setDefaultPatientStatus(id);
+      if (!success) {
+        message.error('Не вдалося встановити статус за замовчуванням');
+        return;
+      }
+      message.success('Статус за замовчуванням оновлено');
+      loadData();
+    } catch (error) {
+      console.error('Failed to set default status:', error);
+      message.error('Помилка оновлення');
     }
   };
 
@@ -123,20 +209,24 @@ const Dictionaries: React.FC = () => {
     if (!newName.trim()) return;
 
     try {
-      const handler = activeTab === 'doctors' ? 'db:dict:addDoctor' : 'db:dict:addDiagnosis';
-      await window.ipcRenderer.invoke(handler, newName.trim());
+      if (activeTab === 'statuses') {
+        await patientsApi.createPatientStatusEntry(newName.trim());
+      } else {
+        const handler = activeTab === 'doctors' ? 'db:dict:addDoctor' : 'db:dict:addDiagnosis';
+        await window.ipcRenderer.invoke(handler, newName.trim());
+        refreshDictionaries();
+      }
       message.success('Додано');
       setAddModalVisible(false);
       setNewName('');
       loadData();
-      refreshDictionaries();
     } catch (error) {
       console.error('Failed to add:', error);
       message.error('Помилка додавання');
     }
   };
 
-  // Table columns
+  // Table columns for doctors/diagnoses
   const columns: ColumnsType<DictionaryItem> = [
     {
       title: 'Назва',
@@ -226,6 +316,112 @@ const Dictionaries: React.FC = () => {
     },
   ];
 
+  // Table columns for patient statuses
+  const statusColumns: ColumnsType<PatientStatusItem> = [
+    {
+      title: 'Назва',
+      dataIndex: 'name',
+      key: 'name',
+      sorter: (a, b) => a.name.localeCompare(b.name),
+      render: (text, record) => (
+        <span style={{ color: record.deletedAt ? '#999' : 'inherit' }}>
+          {text}
+        </span>
+      ),
+    },
+    {
+      title: 'За замовчуванням',
+      dataIndex: 'isDefault',
+      key: 'isDefault',
+      width: 160,
+      render: (isDefault, record) => (
+        <Radio
+          checked={isDefault}
+          onChange={() => handleSetDefaultStatus(record.id)}
+          disabled={!!record.deletedAt} // Cannot set archived status as default
+        >
+          {isDefault && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 4 }} />}
+        </Radio>
+      ),
+    },
+    {
+      title: 'Статус',
+      dataIndex: 'deletedAt',
+      key: 'status',
+      width: 120,
+      filters: [
+        { text: 'Активний', value: 'active' },
+        { text: 'Архівований', value: 'deleted' },
+      ],
+      onFilter: (value, record) => {
+        if (value === 'active') return !record.deletedAt;
+        return !!record.deletedAt;
+      },
+      render: (deletedAt) => (
+        deletedAt ? (
+          <Tag color="red">Архівований</Tag>
+        ) : (
+          <Tag color="green">Активний</Tag>
+        )
+      ),
+    },
+    {
+      title: 'Створено',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 180,
+      render: (text) => formatDate(text),
+      sorter: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+    },
+    {
+      title: 'Оновлено',
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      width: 180,
+      render: (text) => formatDate(text),
+      sorter: (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+    },
+    {
+      title: 'Дії',
+      key: 'actions',
+      width: 100,
+      render: (_, record) => (
+        <Space size="small">
+          <Tooltip title="Редагувати">
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleEditStatus(record)}
+            />
+          </Tooltip>
+          {record.deletedAt ? (
+            <Tooltip title="Відновити">
+              <Button
+                type="text"
+                size="small"
+                icon={<UndoOutlined />}
+                style={{ color: '#52c41a' }}
+                onClick={() => handleRestoreStatus(record)}
+              />
+            </Tooltip>
+          ) : (
+            <Tooltip title={record.isDefault ? "Статус за замовчуванням не можна архівувати" : "Архівувати"}>
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDeleteStatus(record)}
+                disabled={record.isDefault}
+              />
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
   const tabItems = [
     {
       key: 'doctors',
@@ -261,6 +457,23 @@ const Dictionaries: React.FC = () => {
         />
       ),
     },
+    {
+      key: 'statuses',
+      label: 'Статуси пацієнтів',
+      children: (
+        <Table
+          columns={statusColumns}
+          dataSource={statuses}
+          rowKey="id"
+          loading={loading}
+          pagination={{ 
+            pageSize: 10, 
+            showSizeChanger: true, 
+            showTotal: (total, range) => `${range[0]}-${range[1]} з ${total} записів` 
+          }}
+        />
+      ),
+    },
   ];
 
   return (
@@ -273,7 +486,7 @@ const Dictionaries: React.FC = () => {
           icon={<PlusOutlined />}
           onClick={() => setAddModalVisible(true)}
         >
-          Додати {activeTab === 'doctors' ? 'лікаря' : 'діагноз'}
+          Додати {activeTab === 'doctors' ? 'лікаря' : activeTab === 'diagnoses' ? 'діагноз' : 'статус'}
         </Button>
       </div>
 
@@ -291,6 +504,7 @@ const Dictionaries: React.FC = () => {
         onCancel={() => {
           setEditModalVisible(false);
           setEditingItem(null);
+          setEditingStatus(null);
           setEditName('');
         }}
         okText="Зберегти"
@@ -306,7 +520,7 @@ const Dictionaries: React.FC = () => {
 
       {/* Add Modal */}
       <Modal
-        title={`Додати ${activeTab === 'doctors' ? 'лікаря' : 'діагноз'}`}
+        title={`Додати ${activeTab === 'doctors' ? 'лікаря' : activeTab === 'diagnoses' ? 'діагноз' : 'статус'}`}
         open={addModalVisible}
         onOk={handleAdd}
         onCancel={() => {
