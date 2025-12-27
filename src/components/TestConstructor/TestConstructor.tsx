@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Card, List, message, Empty, Tooltip } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, ImportOutlined, ExportOutlined } from '@ant-design/icons';
+import { Button, Card, List, message, Empty, Tooltip, Switch, Space } from 'antd';
+import { PlusOutlined, EditOutlined, DeleteOutlined, ImportOutlined, ExportOutlined, UndoOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import TestEditor from './TestEditor/TestEditor';
 import { TEST_TYPES } from './TestEditor/TestTypesWrapper/constants/testTypes';
@@ -15,14 +15,17 @@ export interface Test {
   testData: object;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: string;
 }
 
 const TestConstructor: React.FC = () => {
   const { t } = useTranslation();
   const [tests, setTests] = useState<Test[]>([]);
+  const [archivedTests, setArchivedTests] = useState<Test[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentView, setCurrentView] = useState<'list' | 'editor'>('list');
   const [editingTest, setEditingTest] = useState<Test | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
 
   const getTestTypeLabel = (testType: string) => {
     switch (testType) {
@@ -38,6 +41,8 @@ const TestConstructor: React.FC = () => {
     try {
       const testList = await testApi.getTests();
       setTests(testList);
+      const archived = await testApi.getArchivedTests();
+      setArchivedTests(archived);
     } catch (error) {
       console.error('Failed to load tests:', error);
       message.error('Помилка завантаження тестів');
@@ -60,14 +65,25 @@ const TestConstructor: React.FC = () => {
     setCurrentView('editor');
   };
 
-  const handleDeleteTest = async (testId: string) => {
+  const handleArchiveTest = async (testId: string) => {
     try {
-      await testApi.deleteTest(testId);
-      message.success('Тест видалено успішно');
+      await testApi.archiveTest(testId);
+      message.success('Тест переміщено в архів');
       loadTests();
     } catch (error) {
-      console.error('Failed to delete test:', error);
-      message.error('Помилка видалення тесту');
+      console.error('Failed to archive test:', error);
+      message.error('Помилка архівування тесту');
+    }
+  };
+
+  const handleRestoreTest = async (testId: string) => {
+    try {
+      await testApi.restoreTest(testId);
+      message.success('Тест відновлено з архіву');
+      loadTests();
+    } catch (error) {
+      console.error('Failed to restore test:', error);
+      message.error('Помилка відновлення тесту');
     }
   };
 
@@ -134,6 +150,8 @@ const TestConstructor: React.FC = () => {
     );
   }
 
+  const displayedTests = showArchived ? archivedTests : tests;
+
   return (
     <div className="test-constructor-container">
       <div className="test-constructor-header">
@@ -141,6 +159,17 @@ const TestConstructor: React.FC = () => {
         Конструктор тестів
       </h1>
         <div className="header-actions">
+          <Space style={{ marginRight: '24px' }}>
+            <span>Показати архів</span>
+            <Switch 
+              checked={showArchived} 
+              onChange={setShowArchived}
+              size="small"
+            />
+            {archivedTests.length > 0 && (
+              <span style={{ color: '#999' }}>({archivedTests.length})</span>
+            )}
+          </Space>
           <Button
             icon={<ImportOutlined />}
             onClick={handleImportTest}
@@ -164,19 +193,21 @@ const TestConstructor: React.FC = () => {
             <div className="loading-spinner" />
             <p>Завантаження тестів...</p>
           </div>
-        ) : tests.length === 0 ? (
+        ) : displayedTests.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
               <div>
-                <h3>Немає створених тестів</h3>
-                <p>Створіть свій перший медичний тест</p>
+                <h3>{showArchived ? 'Архів порожній' : 'Немає створених тестів'}</h3>
+                <p>{showArchived ? 'Немає архівованих тестів' : 'Створіть свій перший медичний тест'}</p>
               </div>
             }
           >
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleAddTest}>
-              Створити тест
-            </Button>
+            {!showArchived && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={handleAddTest}>
+                Створити тест
+              </Button>
+            )}
           </Empty>
         ) : (
           <List
@@ -190,7 +221,7 @@ const TestConstructor: React.FC = () => {
               xl: 3,
               xxl: 4,
             }}
-            dataSource={tests}
+            dataSource={displayedTests}
             renderItem={(test) => (
               <List.Item style={{ width: '100%' }}>
                 <Card
@@ -211,19 +242,31 @@ const TestConstructor: React.FC = () => {
                   }
                   extra={
                     <div className="test-card-actions">
-                      <Button
-                        type="text"
-                        icon={<EditOutlined />}
-                        onClick={() => handleEditTest(test)}
-                        title="Редагувати"
-                      />
-                      <Button
-                        type="text"
-                        danger
-                        icon={<DeleteOutlined />}
-                        onClick={() => handleDeleteTest(test.id)}
-                        title="Видалити"
-                      />
+                      {showArchived ? (
+                        <Button
+                          type="text"
+                          icon={<UndoOutlined />}
+                          onClick={() => handleRestoreTest(test.id)}
+                          title="Відновити"
+                          style={{ color: '#52c41a' }}
+                        />
+                      ) : (
+                        <>
+                          <Button
+                            type="text"
+                            icon={<EditOutlined />}
+                            onClick={() => handleEditTest(test)}
+                            title="Редагувати"
+                          />
+                          <Button
+                            type="text"
+                            danger
+                            icon={<DeleteOutlined />}
+                            onClick={() => handleArchiveTest(test.id)}
+                            title="В архів"
+                          />
+                        </>
+                      )}
                     </div>
                   }
                 >
@@ -238,16 +281,24 @@ const TestConstructor: React.FC = () => {
                         Діагнозів: {(test.testData as any)?.diagnosisRanges?.length || 0}
                       </span>
                     </div>
-                    <div className="test-card-footer">
-                      <Button
-                        icon={<ExportOutlined />}
-                        size="small"
-                        type="primary"
-                        onClick={() => handleExportTest(test.id, test.name)}
-                      >
-                        Експортувати тест
-                      </Button>
-                    </div>
+                    {showArchived ? (
+                      <div className="test-card-footer">
+                        <span style={{ color: '#999', fontSize: '12px' }}>
+                          Архівовано: {test.deletedAt ? new Date(test.deletedAt).toLocaleDateString('uk-UA') : '—'}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="test-card-footer">
+                        <Button
+                          icon={<ExportOutlined />}
+                          size="small"
+                          type="primary"
+                          onClick={() => handleExportTest(test.id, test.name)}
+                        >
+                          Експортувати тест
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               </List.Item>

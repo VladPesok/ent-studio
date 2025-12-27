@@ -26,6 +26,23 @@ export const updateTest = async (testId: string, testData: TestData): Promise<Te
   return window.ipcRenderer.invoke("fs:tests:update", testId, testData);
 };
 
+// Archive test (soft delete)
+export const archiveTest = async (testId: string): Promise<{ success: boolean }> => {
+  return window.ipcRenderer.invoke("fs:tests:archive", testId);
+};
+
+// Restore archived test
+export const restoreTest = async (testId: string): Promise<{ success: boolean }> => {
+  return window.ipcRenderer.invoke("fs:tests:restore", testId);
+};
+
+// Get archived tests
+export const getArchivedTests = async (): Promise<Test[]> => {
+  const allTests = await window.ipcRenderer.invoke("fs:tests:getAll", true);
+  return allTests.filter((t: Test & { deletedAt?: string }) => t.deletedAt);
+};
+
+// Legacy delete - now archives instead
 export const deleteTest = async (testId: string): Promise<void> => {
   return window.ipcRenderer.invoke("fs:tests:delete", testId);
 };

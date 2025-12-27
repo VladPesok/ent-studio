@@ -27,16 +27,16 @@ const HandicapIndexTaker: React.FC<HandicapIndexTakerProps> = ({
   isRetaking = false
 }) => {
   // Initialize state based on whether we're retaking or continuing
-  const initialQuestionIndex = isRetaking ? 0 : patientTest.progress.currentQuestionIndex;
-  const initialAnswers = isRetaking ? patientTest.progress.answers : patientTest.progress.answers;
+  const initialQuestionIndex = isRetaking ? 0 : (patientTest.progress?.currentQuestionIndex ?? 0);
+  const initialAnswers = isRetaking ? [] : (patientTest.progress?.answers ?? []);
   
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(initialQuestionIndex);
   const [answers, setAnswers] = useState<TestAnswer[]>(initialAnswers);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const questions = patientTest.testData.questions;
-  const answerOptions = patientTest.testData.answerOptions || DEFAULT_ANSWER_OPTIONS;
+  const questions = patientTest.testData?.questions ?? [];
+  const answerOptions = patientTest.testData?.answerOptions || DEFAULT_ANSWER_OPTIONS;
   const currentQuestion = questions[currentQuestionIndex];
   const totalQuestions = questions.length;
   const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
@@ -122,7 +122,7 @@ const HandicapIndexTaker: React.FC<HandicapIndexTakerProps> = ({
       
       const finalScore = patientTestsApi.calculateTestScore(finalAnswers);
       
-      const diagnosis = patientTestsApi.findDiagnosisByScore(finalScore, patientTest.testData.diagnosisRanges);
+      const diagnosis = patientTestsApi.findDiagnosisByScore(finalScore, patientTest.testData?.diagnosisRanges ?? []);
       
       const updatedTest = await patientTestsApi.updatePatientTest(baseFolder, currentAppointment, patientTest.id, {
         currentQuestionIndex,

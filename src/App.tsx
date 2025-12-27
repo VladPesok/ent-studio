@@ -34,6 +34,20 @@ const AppShell: React.FC = () => {
 
   const { token } = useToken();
 
+  // Load saved collapsed state
+  useEffect(() => {
+    window.ipcRenderer.invoke("db:settings:get", "siderCollapsed").then((saved) => {
+      if (saved !== null) setCollapsed(saved);
+    });
+  }, []);
+
+  // Save collapsed state when changed
+  const handleToggleCollapsed = () => {
+    const newValue = !collapsed;
+    setCollapsed(newValue);
+    window.ipcRenderer.invoke("db:settings:set", "siderCollapsed", newValue);
+  };
+
   useEffect(() => {
     i18n.changeLanguage(locale);
   }, [locale, i18n]);
@@ -51,7 +65,7 @@ const AppShell: React.FC = () => {
         <Layout>
           <AppHeader
             collapsed={collapsed}
-            onToggle={() => setCollapsed(!collapsed)}
+            onToggle={handleToggleCollapsed}
             token={token}
           />
           <Content className="app-content">

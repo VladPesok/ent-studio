@@ -1,7 +1,7 @@
 import { eq, sql, desc, asc, and, or, like, inArray, gte, lte } from 'drizzle-orm';
 import { ipcMain } from 'electron';
 import { getDb } from '../connection';
-import { patients, appointments, doctors, diagnoses, patientStatuses, PATIENT_STATUS_ACTIVE, type Patient, type NewPatient } from '../models';
+import { patients, appointments, doctors, diagnoses, patientStatuses, patientTests, PATIENT_STATUS_ACTIVE, type Patient, type NewPatient } from '../models';
 import { getOrCreateDoctor } from './doctorDao';
 import { getOrCreateDiagnosis } from './diagnosisDao';
 import { getDefaultPatientStatus } from './patientStatusDao';
@@ -601,6 +601,9 @@ export function mergePatientAppointments(
   const mergedDates: string[] = [];
   const existingDatesList: string[] = [];
 
+  // Map old appointment IDs to new appointment IDs for test migration
+  const appointmentIdMap = new Map<number, number>();
+
   for (const appt of sourceAppointments) {
     if (existingDates.has(appt.date)) {
       // Appointment with this date already exists in target
@@ -614,6 +617,9 @@ export function mergePatientAppointments(
         notes: appt.notes,
       }).run();
       
+      const newAppointmentId = Number(result.lastInsertRowid);
+      appointmentIdMap.set(appt.id, newAppointmentId);
+      
       // Copy appointment doctors
       const sourceApptDoctors = db
         .select({ doctorId: sql<number>`doctor_id` })
@@ -622,11 +628,29 @@ export function mergePatientAppointments(
         .all();
         
       for (const doc of sourceApptDoctors) {
-        db.run(sql`INSERT INTO appointment_doctors (appointment_id, doctor_id) VALUES (${Number(result.lastInsertRowid)}, ${doc.doctorId})`);
+        db.run(sql`INSERT INTO appointment_doctors (appointment_id, doctor_id) VALUES (${newAppointmentId}, ${doc.doctorId})`);
       }
       
       mergedDates.push(appt.date);
     }
+  }
+
+  // Move patient tests from source to target patient and remap appointment IDs
+  if (appointmentIdMap.size > 0) {
+    const caseClauses = Array.from(appointmentIdMap)
+      .map(([oldId, newId]) => `WHEN ${oldId} THEN ${newId}`)
+      .join(' ');
+    db.run(sql`
+      UPDATE patient_tests 
+      SET patient_id = ${targetPatient.id},
+          appointment_id = CASE appointment_id ${sql.raw(caseClauses)} ELSE appointment_id END
+      WHERE patient_id = ${sourcePatient.id}
+    `);
+  } else {
+    db.update(patientTests)
+      .set({ patientId: targetPatient.id })
+      .where(eq(patientTests.patientId, sourcePatient.id))
+      .run();
   }
 
   return { mergedDates, existingDates: existingDatesList };

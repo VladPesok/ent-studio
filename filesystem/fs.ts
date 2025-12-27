@@ -836,11 +836,11 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
 
   // ==================== Medical Tests (File Operations) ====================
 
-  ipcMain.handle("fs:tests:getAll", async () => {
+  ipcMain.handle("fs:tests:getAll", async (_e, includeArchived: boolean = false) => {
     try {
       const entries = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
 
-      const tests = await Promise.all(
+      const allTests = await Promise.all(
         entries
           .filter(entry => entry.isFile() && entry.name.endsWith('.json'))
           .map(async (entry) => {
@@ -849,6 +849,9 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
             return JSON.parse(content);
           })
       );
+
+      // Filter out archived tests unless explicitly requested
+      const tests = includeArchived ? allTests : allTests.filter(t => !t.deletedAt);
 
       return tests.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
     } catch (error) {
@@ -962,6 +965,62 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
     }
   });
 
+  // Archive test (soft delete) - sets deletedAt instead of deleting file
+  ipcMain.handle("fs:tests:archive", async (_e, testId: string) => {
+    try {
+      const files = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
+
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith('.json')) {
+          const filePath = path.join(medicalTestsRoot, file.name);
+          const content = await fs.readFile(filePath, 'utf8');
+          const test = JSON.parse(content);
+
+          if (test.id === testId) {
+            const archivedTest = {
+              ...test,
+              deletedAt: new Date().toISOString(),
+            };
+            await fs.writeFile(filePath, JSON.stringify(archivedTest, null, 2), 'utf8');
+            return { success: true };
+          }
+        }
+      }
+
+      throw new Error('Test not found');
+    } catch (error) {
+      console.error('Error archiving test:', error);
+      throw error;
+    }
+  });
+
+  // Restore archived test - removes deletedAt
+  ipcMain.handle("fs:tests:restore", async (_e, testId: string) => {
+    try {
+      const files = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
+
+      for (const file of files) {
+        if (file.isFile() && file.name.endsWith('.json')) {
+          const filePath = path.join(medicalTestsRoot, file.name);
+          const content = await fs.readFile(filePath, 'utf8');
+          const test = JSON.parse(content);
+
+          if (test.id === testId) {
+            const { deletedAt, ...restoredTest } = test;
+            await fs.writeFile(filePath, JSON.stringify(restoredTest, null, 2), 'utf8');
+            return { success: true };
+          }
+        }
+      }
+
+      throw new Error('Test not found');
+    } catch (error) {
+      console.error('Error restoring test:', error);
+      throw error;
+    }
+  });
+
+  // Legacy delete handler - now archives instead
   ipcMain.handle("fs:tests:delete", async (_e, testId: string) => {
     try {
       const files = await fs.readdir(medicalTestsRoot, { withFileTypes: true });
@@ -973,7 +1032,11 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
           const test = JSON.parse(content);
 
           if (test.id === testId) {
-            await fs.unlink(filePath);
+            const archivedTest = {
+              ...test,
+              deletedAt: new Date().toISOString(),
+            };
+            await fs.writeFile(filePath, JSON.stringify(archivedTest, null, 2), 'utf8');
             return { success: true };
           }
         }
@@ -981,7 +1044,7 @@ export const setFsOperations = async (mainWindow: BrowserWindow): Promise<void> 
 
       throw new Error('Test not found');
     } catch (error) {
-      console.error('Error deleting test:', error);
+      console.error('Error archiving test:', error);
       throw error;
     }
   });

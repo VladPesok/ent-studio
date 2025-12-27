@@ -157,20 +157,20 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
   };
 
   const getTestStatusIcon = (test: PatientTest) => {
-    if (test.progress.completed) {
+    if (test.progress?.completed) {
       return <CheckCircleOutlined style={{ color: '#52c41a' }} />;
     }
-    if (test.progress.answers.length > 0) {
+    if ((test.progress?.answers?.length ?? 0) > 0) {
       return <ClockCircleOutlined style={{ color: '#faad14' }} />;
     }
     return <PlayCircleOutlined style={{ color: '#1890ff' }} />;
   };
 
   const getTestStatusText = (test: PatientTest) => {
-    if (test.progress.completed) {
+    if (test.progress?.completed) {
       return 'Завершено';
     }
-    if (test.progress.answers.length > 0) {
+    if ((test.progress?.answers?.length ?? 0) > 0) {
       return 'В процесі';
     }
     return 'Не розпочато';
@@ -323,9 +323,9 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
                   icon={getTestStatusIcon(patientTest)}
                   onClick={() => handleStartTest(patientTest)}
                 >
-                  {patientTest.progress.completed ? 'Переглянути' : 'Пройти тест'}
+                  {patientTest.progress?.completed ? 'Переглянути' : 'Пройти тест'}
                 </Button>,
-                ...(patientTest.progress.completed ? [
+                ...(patientTest.progress?.completed ? [
                   <Button
                     key="restart"
                     type="link"
@@ -361,7 +361,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
                   <Text type="secondary">
                     Додано: {formatDate(patientTest.createdAt)}
                   </Text>
-                  {patientTest.progress.completedAt && (
+                  {patientTest.progress?.completedAt && (
                     <Text type="secondary">
                       Завершено: {formatDate(patientTest.progress.completedAt)}
                     </Text>
@@ -379,12 +379,12 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
                   </div>
                   <Progress 
                     percent={progress.progressPercentage} 
-                    status={patientTest.progress.completed ? 'success' : 'active'}
+                    status={patientTest.progress?.completed ? 'success' : 'active'}
                     strokeWidth={8}
                   />
                 </div>
 
-                {patientTest.progress.completed && patientTest.progress.diagnosis && (
+                {patientTest.progress?.completed && patientTest.progress?.diagnosis && (
                   <div className="test-card-result">
                     <Text strong>Результат: </Text>
                     <Text>{patientTest.progress.diagnosis}</Text>

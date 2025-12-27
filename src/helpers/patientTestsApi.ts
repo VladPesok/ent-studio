@@ -85,8 +85,8 @@ export const deletePatientTest = async (
 
 // Utility functions
 export const getTestProgress = (test: PatientTest): { answeredQuestions: number; totalQuestions: number; progressPercentage: number } => {
-  const totalQuestions = test.testData.questions.length;
-  const answeredQuestions = test.progress.answers.length;
+  const totalQuestions = test.testData?.questions?.length ?? 0;
+  const answeredQuestions = test.progress?.answers?.length ?? 0;
   const progressPercentage = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0;
   
   return {
@@ -97,11 +97,11 @@ export const getTestProgress = (test: PatientTest): { answeredQuestions: number;
 };
 
 export const isTestCompleted = (test: PatientTest): boolean => {
-  return test.progress.completed;
+  return test.progress?.completed ?? false;
 };
 
 export const getTestDiagnosis = (test: PatientTest): string | null => {
-  if (!test.progress.completed || !test.progress.diagnosis) {
+  if (!test.progress?.completed || !test.progress?.diagnosis) {
     return null;
   }
   return test.progress.diagnosis;
