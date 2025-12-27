@@ -24,7 +24,7 @@ const TestTaker: React.FC<TestTakerProps> = ({
   onCancel
 }) => {
   const { t } = useTranslation();
-  const [showingResult, setShowingResult] = useState(patientTest.progress.completed);
+  const [showingResult, setShowingResult] = useState(patientTest.progress?.completed ?? false);
 
   const handleTestComplete = (updatedTest: PatientTest) => {
     setShowingResult(true);
@@ -40,12 +40,12 @@ const TestTaker: React.FC<TestTakerProps> = ({
   };
 
   const getTestResult = () => {
-    if (!patientTest.progress.completed) return null;
+    if (!patientTest.progress?.completed) return null;
     
     return {
-      score: patientTest.progress.score,
-      diagnosis: patientTest.progress.diagnosis,
-      completedAt: patientTest.progress.completedAt
+      score: patientTest.progress.score ?? 0,
+      diagnosis: patientTest.progress.diagnosis ?? null,
+      completedAt: patientTest.progress.completedAt ?? null
     };
   };
 
@@ -104,7 +104,7 @@ const TestTaker: React.FC<TestTakerProps> = ({
         baseFolder={baseFolder}
         currentAppointment={currentAppointment}
         onTestComplete={handleTestComplete}
-        isRetaking={!patientTest.progress.completed && patientTest.progress.answers.length > 0}
+        isRetaking={!patientTest.progress?.completed && (patientTest.progress?.answers?.length ?? 0) > 0}
       />
     );
   };

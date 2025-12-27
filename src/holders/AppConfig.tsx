@@ -28,6 +28,8 @@ export interface AppConfig {
   diagnoses: string[];
   addDiagnosis(d: string): Promise<void>;
 
+  refreshDictionaries(): Promise<void>;
+
   patientCards: PatientCard[];
   defaultPatientCard: string | null;
   loadPatientCards(): Promise<void>;
@@ -95,6 +97,16 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
     if (!trimmed || diagnoses.includes(trimmed)) return;
     await configApi.addDictionaryEntry("diagnosis", trimmed);
     setDiagnoses((prev) => [...prev, trimmed]);
+  };
+
+  const refreshDictionaries = async () => {
+    try {
+      const dictionaries = await configApi.getDictionaries();
+      setDoctors(dictionaries.doctors);
+      setDiagnoses(dictionaries.diagnosis);
+    } catch (error) {
+      console.error('Failed to refresh dictionaries:', error);
+    }
   };
 
   const loadPatientCards = async () => {
@@ -169,6 +181,7 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
       addDoctor,
       diagnoses,
       addDiagnosis,
+      refreshDictionaries,
       patientCards,
       defaultPatientCard,
       loadPatientCards,

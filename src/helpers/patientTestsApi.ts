@@ -1,4 +1,4 @@
-// Patient Tests API - uses ipcRenderer directly like other APIs
+// Patient Tests API - uses database IPC handlers
 
 // Patient Test Progress interfaces
 export interface TestAnswer {
@@ -32,10 +32,10 @@ export interface PatientTest {
   progress: TestProgress;
 }
 
-// API functions
+// API functions - all use database handlers
 export const getPatientTests = async (folder: string, currentAppointment?: string): Promise<PatientTest[]> => {
   try {
-    return await window.ipcRenderer.invoke("patientTests:getAll", folder, currentAppointment);
+    return await window.ipcRenderer.invoke("db:patientTests:getAll", folder, currentAppointment);
   } catch (error) {
     console.error('Failed to get patient tests:', error);
     throw error;
@@ -49,7 +49,7 @@ export const createPatientTest = async (
   testData: any
 ): Promise<PatientTest> => {
   try {
-    return await window.ipcRenderer.invoke("patientTests:create", folder, currentAppointment, testId, testData);
+    return await window.ipcRenderer.invoke("db:patientTests:create", folder, currentAppointment, testId, testData);
   } catch (error) {
     console.error('Failed to create patient test:', error);
     throw error;
@@ -63,7 +63,7 @@ export const updatePatientTest = async (
   progressData: Partial<TestProgress>
 ): Promise<PatientTest> => {
   try {
-    return await window.ipcRenderer.invoke("patientTests:update", folder, currentAppointment, patientTestId, progressData);
+    return await window.ipcRenderer.invoke("db:patientTests:update", folder, currentAppointment, patientTestId, progressData);
   } catch (error) {
     console.error('Failed to update patient test:', error);
     throw error;
@@ -76,7 +76,7 @@ export const deletePatientTest = async (
   patientTestId: string
 ): Promise<{ success: boolean }> => {
   try {
-    return await window.ipcRenderer.invoke("patientTests:delete", folder, currentAppointment, patientTestId);
+    return await window.ipcRenderer.invoke("db:patientTests:delete", folder, currentAppointment, patientTestId);
   } catch (error) {
     console.error('Failed to delete patient test:', error);
     throw error;
@@ -85,8 +85,8 @@ export const deletePatientTest = async (
 
 // Utility functions
 export const getTestProgress = (test: PatientTest): { answeredQuestions: number; totalQuestions: number; progressPercentage: number } => {
-  const totalQuestions = test.testData.questions.length;
-  const answeredQuestions = test.progress.answers.length;
+  const totalQuestions = test.testData?.questions?.length ?? 0;
+  const answeredQuestions = test.progress?.answers?.length ?? 0;
   const progressPercentage = totalQuestions > 0 ? Math.round((answeredQuestions / totalQuestions) * 100) : 0;
   
   return {
@@ -97,11 +97,11 @@ export const getTestProgress = (test: PatientTest): { answeredQuestions: number;
 };
 
 export const isTestCompleted = (test: PatientTest): boolean => {
-  return test.progress.completed;
+  return test.progress?.completed ?? false;
 };
 
 export const getTestDiagnosis = (test: PatientTest): string | null => {
-  if (!test.progress.completed || !test.progress.diagnosis) {
+  if (!test.progress?.completed || !test.progress?.diagnosis) {
     return null;
   }
   return test.progress.diagnosis;
