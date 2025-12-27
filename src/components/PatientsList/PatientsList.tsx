@@ -405,12 +405,12 @@ const PatientsList: React.FC = () => {
       sorter: true,
       render: (statusName, r) => {
         const isActive = r.statusId === 1;
-        const statusMenuItems: MenuProps['items'] = patientStatuses
+        const statusMenuItems = patientStatuses
           .filter(status => status.id !== r.statusId)
           .map(status => ({
             key: status.id.toString(),
             label: status.name,
-            onClick: (info: { domEvent: React.MouseEvent }) => handleStatusChange(r.folder, status.id, info.domEvent),
+            onClick: (info: { domEvent: React.MouseEvent | React.KeyboardEvent }) => handleStatusChange(r.folder, status.id, info.domEvent as React.MouseEvent),
           }));
 
         return (
