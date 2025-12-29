@@ -1,7 +1,7 @@
 import { eq, sql, desc, asc, and, or, like, inArray, gte, lte } from 'drizzle-orm';
 import { ipcMain } from 'electron';
 import { getDb } from '../connection';
-import { patients, appointments, doctors, diagnoses, patientStatuses, patientTests, PATIENT_STATUS_ACTIVE, type Patient, type NewPatient } from '../models';
+import { patients, appointments, appointmentDoctors, doctors, diagnoses, patientStatuses, patientTests, PATIENT_STATUS_ACTIVE, type Patient, type NewPatient } from '../models';
 import { getOrCreateDoctor } from './doctorDao';
 import { getOrCreateDiagnosis } from './diagnosisDao';
 import { getDefaultPatientStatus } from './patientStatusDao';
@@ -406,11 +406,20 @@ export function createPatient(
       .get();
 
     if (!appointmentExists) {
-      db.insert(appointments).values({
+      const appointmentResult = db.insert(appointments).values({
         patientId,
         appointmentDate,
         diagnosisId,
       }).run();
+      
+      // Also link doctor to appointment if provided
+      if (doctorId) {
+        const appointmentId = Number(appointmentResult.lastInsertRowid);
+        db.insert(appointmentDoctors).values({
+          appointmentId,
+          doctorId,
+        }).run();
+      }
     }
   }
 

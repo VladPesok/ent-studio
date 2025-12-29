@@ -39,6 +39,7 @@ const PatientsList: React.FC = () => {
   const [patientStatuses, setPatientStatuses] = useState<patientsApi.PatientStatus[]>([]);
 
   const [addOpen, setAddOpen] = useState(false);
+  const [tableLoading, setTableLoading] = useState(true);
   const [importLoading, setImportLoading] = useState(false);
   const [importProgress, setImportProgress] = useState<ImportProgress>({ current: 0, total: 0, progress: 0, folderName: '' });
   const [tableState, setTableState] = useState<patientsApi.TableState>({
@@ -259,45 +260,55 @@ const PatientsList: React.FC = () => {
     onFilter: () => true
   });
 
-  const reloadPatients = async (state?: patientsApi.TableState) => {
-    const stateToUse = state || tableState;
-    const dbFilters = patientsApi.tableStateToDbFilters(stateToUse);
+  const reloadPatients = async (state?: patientsApi.TableState, showLoader = false) => {
+    if (showLoader) setTableLoading(true);
+    try {
+      const stateToUse = state || tableState;
+      const dbFilters = patientsApi.tableStateToDbFilters(stateToUse);
 
-    const result = await patientsApi.getPatients(dbFilters);
-    setPatients(result.data);
-    setTableState(prev => ({
-      ...prev,
-      pagination: {
-        ...prev.pagination,
-        total: result.total,
-        current: result.page,
-        pageSize: result.pageSize
-      }
-    }));
+      const result = await patientsApi.getPatients(dbFilters);
+      setPatients(result.data);
+      setTableState(prev => ({
+        ...prev,
+        pagination: {
+          ...prev.pagination,
+          total: result.total,
+          current: result.page,
+          pageSize: result.pageSize
+        }
+      }));
+    } finally {
+      if (showLoader) setTableLoading(false);
+    }
   };
 
   // Load saved table state on mount
   useEffect(() => {
     const initializeTableState = async () => {
-      const savedState = await loadTableState(TABLE_KEYS.PATIENTS);
-      if (savedState) {
-        const restoredState: patientsApi.TableState = {
-          pagination: { 
-            current: 1, 
-            pageSize: savedState.pageSize || 10, 
-            total: 0 
-          },
-          filters: savedState.filters || {},
-          sorter: savedState.sorter ? {
-            field: savedState.sorter.field,
-            order: savedState.sorter.order,
-          } : {},
-          search: ''
-        };
-        setTableState(restoredState);
-        reloadPatients(restoredState);
-      } else {
-        reloadPatients();
+      setTableLoading(true);
+      try {
+        const savedState = await loadTableState(TABLE_KEYS.PATIENTS);
+        if (savedState) {
+          const restoredState: patientsApi.TableState = {
+            pagination: { 
+              current: 1, 
+              pageSize: savedState.pageSize || 10, 
+              total: 0 
+            },
+            filters: savedState.filters || {},
+            sorter: savedState.sorter ? {
+              field: savedState.sorter.field,
+              order: savedState.sorter.order,
+            } : {},
+            search: ''
+          };
+          setTableState(restoredState);
+          await reloadPatients(restoredState);
+        } else {
+          await reloadPatients();
+        }
+      } finally {
+        setTableLoading(false);
       }
     };
     initializeTableState();
@@ -648,6 +659,7 @@ const PatientsList: React.FC = () => {
           <Table
             columns={columns}
             dataSource={data}
+            loading={tableLoading}
             pagination={false}
             onChange={handleTableChange}
             onRow={(record) => ({
