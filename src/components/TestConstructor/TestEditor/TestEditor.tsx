@@ -63,10 +63,10 @@ const TestEditor: React.FC<TestEditorProps> = ({ test, onBack, onTestSaved }) =>
   const handleBack = () => {
     if (hasChanges) {
       Modal.confirm({
-        title: 'Незбережені зміни',
-        content: 'У вас є незбережені зміни. Ви впевнені, що хочете вийти?',
-        okText: 'Так, вийти',
-        cancelText: 'Скасувати',
+        title: t('testConstructor.editor.unsavedChanges'),
+        content: t('testConstructor.editor.unsavedChangesMessage'),
+        okText: t('testConstructor.editor.yesExit'),
+        cancelText: t('common.cancel'),
         onOk: onBack
       });
     } else {
@@ -98,7 +98,7 @@ const TestEditor: React.FC<TestEditorProps> = ({ test, onBack, onTestSaved }) =>
           }
         }
 
-        message.error('Перевірте всі обов\'язкові поля');
+        message.error(t('testConstructor.editor.checkRequiredFields'));
         return;
       }
 
@@ -117,17 +117,17 @@ const TestEditor: React.FC<TestEditorProps> = ({ test, onBack, onTestSaved }) =>
 
       if (isEditing) {
         await testApi.updateTest(test.id, testPayload);
-        message.success('Тест оновлено успішно');
+        message.success(t('testConstructor.editor.messages.testUpdated'));
       } else {
         await testApi.createTest(testPayload);
-        message.success('Тест створено успішно');
+        message.success(t('testConstructor.editor.messages.testCreated'));
       }
 
       setHasChanges(false);
       onTestSaved();
     } catch (error) {
       console.error('Failed to save test:', error);
-      message.error('Помилка збереження тесту');
+      message.error(t('testConstructor.editor.messages.saveError'));
     } finally {
       setSaving(false);
     }
@@ -143,7 +143,7 @@ const TestEditor: React.FC<TestEditorProps> = ({ test, onBack, onTestSaved }) =>
           onChange={handleCardChange}
           className="test-editor-collapse"
         >
-          <Collapse.Panel header="Основна інформація" key="metadata">
+          <Collapse.Panel header={t('testConstructor.editor.basicInfo')} key="metadata">
             <Form
               form={form}
               layout="vertical"
@@ -151,11 +151,11 @@ const TestEditor: React.FC<TestEditorProps> = ({ test, onBack, onTestSaved }) =>
               onValuesChange={handleFormChange}
             >
               <Form.Item
-                label="Тип тесту"
+                label={t('testConstructor.editor.testType')}
                 name="testType"
-                rules={[{ required: true, message: 'Оберіть тип тесту' }]}
+                rules={[{ required: true, message: t('testConstructor.editor.selectTestType') }]}
               >
-                <Select placeholder="Оберіть тип тесту">
+                <Select placeholder={t('testConstructor.editor.selectTestType')}>
                   {TEST_TYPE_CONFIG.map(type => (
                     <Option key={type.value} value={type.value}>
                       {t(type.labelKey)}
@@ -165,21 +165,21 @@ const TestEditor: React.FC<TestEditorProps> = ({ test, onBack, onTestSaved }) =>
               </Form.Item>
 
               <Form.Item
-                label="Назва тесту"
+                label={t('testConstructor.editor.testName')}
                 name="name"
-                rules={[{ required: true, message: 'Введіть назву тесту' }]}
+                rules={[{ required: true, message: t('testConstructor.editor.enterTestName') }]}
               >
-                <Input placeholder="Введіть назву тесту" />
+                <Input placeholder={t('testConstructor.editor.enterTestName')} />
               </Form.Item>
 
               <Form.Item
                 style={{ marginBottom: '0px' }}
-                label="Опис тесту"
+                label={t('testConstructor.editor.testDescription')}
                 name="description"
-                rules={[{ required: true, message: 'Введіть опис тесту' }]}
+                rules={[{ required: true, message: t('testConstructor.editor.enterTestDescription') }]}
               >
                 <TextArea 
-                  placeholder="Введіть опис тесту"
+                  placeholder={t('testConstructor.editor.enterTestDescription')}
                   rows={3}
                 />
               </Form.Item>
@@ -201,7 +201,7 @@ const TestEditor: React.FC<TestEditorProps> = ({ test, onBack, onTestSaved }) =>
             icon={<ArrowLeftOutlined />} 
             onClick={handleBack}
           >
-            Назад до списку
+            {t('testConstructor.editor.backToList')}
           </Button>
           
           <Button 
@@ -211,7 +211,7 @@ const TestEditor: React.FC<TestEditorProps> = ({ test, onBack, onTestSaved }) =>
             loading={saving}
             disabled={!isFormValid()}
           >
-            {isEditing ? 'Оновити тест' : 'Зберегти тест'}
+            {isEditing ? t('testConstructor.editor.updateTest') : t('testConstructor.editor.saveTest')}
           </Button>
         </div>
       </div>

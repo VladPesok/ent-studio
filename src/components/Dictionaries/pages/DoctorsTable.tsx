@@ -1,0 +1,245 @@
+import React, { useState, useEffect, useContext } from 'react';
+import { Table, Button, Modal, Input, Space, Tag, message, Tooltip } from 'antd';
+import { EditOutlined, DeleteOutlined, UndoOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
+import type { ColumnsType, TablePaginationConfig } from 'antd/es/table';
+import type { FilterValue, SorterResult } from 'antd/es/table/interface';
+import { AppConfigContext } from '../../../holders/AppConfig';
+import { DictionaryItem, formatDate } from '../types';
+import { saveTableState, loadTableState, TABLE_KEYS, PersistedTableState } from '../../../helpers/tableStateHelper';
+
+interface DoctorsTableProps {
+  data: DictionaryItem[];
+  loading: boolean;
+  onDataChange: () => void;
+}
+
+const DoctorsTable: React.FC<DoctorsTableProps> = ({ data, loading, onDataChange }) => {
+  const { t } = useTranslation();
+  const { refreshDictionaries, showSizeChanger } = useContext(AppConfigContext);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingItem, setEditingItem] = useState<DictionaryItem | null>(null);
+  const [editName, setEditName] = useState('');
+  
+  // Table state
+  const [pageSize, setPageSize] = useState(10);
+  const [filters, setFilters] = useState<Record<string, FilterValue | null>>({});
+  const [sorter, setSorter] = useState<{ field?: string; order?: 'ascend' | 'descend' }>({});
+
+  // Load saved table state on mount
+  useEffect(() => {
+    const loadSavedState = async () => {
+      const savedState = await loadTableState(TABLE_KEYS.DOCTORS);
+      if (savedState) {
+        if (savedState.pageSize) setPageSize(savedState.pageSize);
+        if (savedState.filters) setFilters(savedState.filters);
+        if (savedState.sorter) setSorter(savedState.sorter);
+      }
+    };
+    loadSavedState();
+  }, []);
+
+  // Save table state when it changes
+  const handleTableChange = (
+    pagination: TablePaginationConfig,
+    tableFilters: Record<string, FilterValue | null>,
+    tableSorter: SorterResult<DictionaryItem> | SorterResult<DictionaryItem>[]
+  ) => {
+    const singleSorter = Array.isArray(tableSorter) ? tableSorter[0] : tableSorter;
+    const newPageSize = pagination.pageSize || 10;
+    const newSorter = singleSorter.field ? {
+      field: singleSorter.field as string,
+      order: singleSorter.order as 'ascend' | 'descend' | undefined,
+    } : {};
+
+    setPageSize(newPageSize);
+    setFilters(tableFilters);
+    setSorter(newSorter);
+
+    const stateToSave: PersistedTableState = {
+      pageSize: newPageSize,
+      filters: tableFilters,
+      sorter: newSorter.field ? newSorter : undefined,
+    };
+    saveTableState(TABLE_KEYS.DOCTORS, stateToSave);
+  };
+
+  const handleEdit = (item: DictionaryItem) => {
+    setEditingItem(item);
+    setEditName(item.name);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingItem || !editName.trim()) return;
+
+    try {
+      await window.ipcRenderer.invoke('db:dict:doctors:update', editingItem.id, editName.trim());
+      message.success(t('dictionaries.messages.saveSuccess'));
+      setEditModalVisible(false);
+      setEditingItem(null);
+      setEditName('');
+      onDataChange();
+      refreshDictionaries();
+    } catch (error) {
+      console.error('Failed to update:', error);
+      message.error(t('dictionaries.messages.saveError'));
+    }
+  };
+
+  const handleDelete = async (item: DictionaryItem) => {
+    try {
+      await window.ipcRenderer.invoke('db:dict:doctors:delete', item.id);
+      message.success(t('dictionaries.messages.deleteSuccess'));
+      onDataChange();
+      refreshDictionaries();
+    } catch (error) {
+      console.error('Failed to delete:', error);
+      message.error(t('dictionaries.messages.deleteError'));
+    }
+  };
+
+  const handleRestore = async (item: DictionaryItem) => {
+    try {
+      await window.ipcRenderer.invoke('db:dict:doctors:restore', item.id);
+      message.success(t('dictionaries.messages.restoreSuccess'));
+      onDataChange();
+      refreshDictionaries();
+    } catch (error) {
+      console.error('Failed to restore:', error);
+      message.error(t('dictionaries.messages.restoreError'));
+    }
+  };
+
+  const columns: ColumnsType<DictionaryItem> = [
+    {
+      title: t('dictionaries.columns.name'),
+      dataIndex: 'name',
+      key: 'name',
+      sorter: (a, b) => a.name.localeCompare(b.name),
+      sortOrder: sorter.field === 'name' ? sorter.order : undefined,
+      render: (text, record) => (
+        <span style={{ color: record.deletedAt ? '#999' : 'inherit' }}>
+          {text}
+        </span>
+      ),
+    },
+    {
+      title: t('dictionaries.columns.createdAt'),
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 180,
+      render: (text) => formatDate(text),
+      sorter: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      sortOrder: sorter.field === 'createdAt' ? sorter.order : undefined,
+    },
+    {
+      title: t('dictionaries.columns.updatedAt'),
+      dataIndex: 'updatedAt',
+      key: 'updatedAt',
+      width: 180,
+      render: (text) => formatDate(text),
+      sorter: (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+      sortOrder: sorter.field === 'updatedAt' ? sorter.order : undefined,
+    },
+    {
+      title: t('dictionaries.columns.status'),
+      dataIndex: 'deletedAt',
+      key: 'status',
+      width: 120,
+      filters: [
+        { text: t('dictionaries.filters.active'), value: 'active' },
+        { text: t('dictionaries.filters.deleted'), value: 'deleted' },
+      ],
+      filteredValue: filters.status as string[] || null,
+      onFilter: (value, record) => {
+        if (value === 'active') return !record.deletedAt;
+        return !!record.deletedAt;
+      },
+      render: (deletedAt) => (
+        deletedAt ? (
+          <Tag color="red">{t('dictionaries.statuses.deleted')}</Tag>
+        ) : (
+          <Tag color="green">{t('dictionaries.statuses.active')}</Tag>
+        )
+      ),
+    },
+    {
+      title: t('dictionaries.columns.actions'),
+      key: 'actions',
+      width: 100,
+      render: (_, record) => (
+        <Space size="small">
+          <Tooltip title={t('dictionaries.tooltips.edit')}>
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
+          {record.deletedAt ? (
+            <Tooltip title={t('dictionaries.tooltips.restore')}>
+              <Button
+                type="text"
+                size="small"
+                icon={<UndoOutlined />}
+                style={{ color: '#52c41a' }}
+                onClick={() => handleRestore(record)}
+              />
+            </Tooltip>
+          ) : (
+            <Tooltip title={t('dictionaries.tooltips.delete')}>
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDelete(record)}
+              />
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
+  ];
+
+  return (
+    <>
+      <Table
+        columns={columns}
+        dataSource={data}
+        rowKey="id"
+        loading={loading}
+        onChange={handleTableChange}
+        pagination={{ 
+          pageSize: pageSize, 
+          showSizeChanger: showSizeChanger, 
+          showTotal: (total, range) => t('common.pagination.showTotal', { start: range[0], end: range[1], total })
+        }}
+      />
+
+      <Modal
+        title={t('dictionaries.modals.editDoctor')}
+        open={editModalVisible}
+        onOk={handleSaveEdit}
+        onCancel={() => {
+          setEditModalVisible(false);
+          setEditingItem(null);
+          setEditName('');
+        }}
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
+      >
+        <Input
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          placeholder={t('dictionaries.placeholders.enterDoctorName')}
+          onPressEnter={handleSaveEdit}
+        />
+      </Modal>
+    </>
+  );
+};
+
+export default DoctorsTable;

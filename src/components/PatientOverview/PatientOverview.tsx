@@ -238,10 +238,10 @@ const PatientOverview: React.FC = () => {
       // Close modal
       setAddAppointmentModalVisible(false);
       
-      message.success('Прийом успішно створено');
+      message.success(t('patientOverview.messages.appointmentCreated'));
     } catch (error) {
       console.error('Failed to create appointment:', error);
-      message.error('Не вдалося створити прийом');
+      message.error(t('patientOverview.messages.appointmentCreateError'));
     } finally {
       setPatientInfoLoading(false);
     }
@@ -257,7 +257,7 @@ const PatientOverview: React.FC = () => {
 
   const handleOpenPatientCard = async () => {
     if (!patientMeta.patientCard) {
-      message.error('Картка пацієнта не знайдена');
+      message.error(t('patientOverview.messages.patientCardNotFound'));
       return;
     }
 
@@ -265,14 +265,14 @@ const PatientOverview: React.FC = () => {
       const result = await configApi.openPatientCard(folder, patientMeta.patientCard);
       if (!result.success) {
         if (result.fallbackUsed) {
-          message.warning('Не вдалося відкрити файл, відкрито папку пацієнта');
+          message.warning(t('patientOverview.messages.openedFolderFallback'));
         } else {
-          message.error(result.error || 'Не вдалося відкрити картку пацієнта');
+          message.error(result.error || t('patientOverview.messages.failedToOpenCard'));
         }
       }
     } catch (error) {
       console.error('Failed to open patient card:', error);
-      message.error('Не вдалося відкрити картку пацієнта');
+      message.error(t('patientOverview.messages.failedToOpenCard'));
     }
   };
 
@@ -310,12 +310,12 @@ const PatientOverview: React.FC = () => {
       setPatientMeta(prev => ({ 
         ...prev, 
         statusId, 
-        statusName: status?.name || 'Невідомий' 
+        statusName: status?.name || 'Unknown' 
       }));
-      message.success('Статус оновлено');
+      message.success(t('patientOverview.messages.statusUpdated'));
     } catch (error) {
       console.error('Failed to update status:', error);
-      message.error('Помилка оновлення статусу');
+      message.error(t('patientOverview.messages.statusUpdateError'));
     }
   };
 
@@ -335,7 +335,7 @@ const PatientOverview: React.FC = () => {
     const { surname: newSurname, name: newName, birthdate: newBirthdate } = renameForm;
     
     if (!newSurname.trim() || !newName.trim() || !newBirthdate.trim()) {
-      setRenameError('Всі поля обов\'язкові');
+      setRenameError(t('patientOverview.renameModal.allFieldsRequired'));
       return;
     }
     
@@ -350,7 +350,7 @@ const PatientOverview: React.FC = () => {
     // Check if new folder already exists
     const exists = await patientsApi.checkPatientExists(newFolder);
     if (exists) {
-      setRenameError('Пацієнт з таким іменем вже існує');
+      setRenameError(t('patientOverview.renameModal.patientExists'));
       return;
     }
     
@@ -367,16 +367,16 @@ const PatientOverview: React.FC = () => {
       );
       
       if (result.success) {
-        message.success('Пацієнта перейменовано');
+        message.success(t('patientOverview.messages.patientRenamed'));
         setRenameModalVisible(false);
         // Navigate to the new URL
         navigate(`/patients/${newFolder}`, { replace: true });
       } else {
-        setRenameError(result.error || 'Помилка перейменування');
+        setRenameError(result.error || t('patientOverview.messages.renameError'));
       }
     } catch (error) {
       console.error('Failed to rename patient:', error);
-      setRenameError('Помилка перейменування пацієнта');
+      setRenameError(t('patientOverview.messages.renameError'));
     } finally {
       setRenameLoading(false);
     }
@@ -416,7 +416,7 @@ const PatientOverview: React.FC = () => {
             key,
             label: (
               <>
-                <VideoCameraOutlined /> {t(tab.folder)}
+                <VideoCameraOutlined /> {tab.name}
               </>
             ),
             children: <VideoGallery baseFolder={folder} currentAppointment={currentAppointment} />,
@@ -426,7 +426,7 @@ const PatientOverview: React.FC = () => {
             key,
             label: (
               <>
-                <AudioOutlined /> {t(tab.folder)}
+                <AudioOutlined /> {tab.name}
               </>
             ),
             children: <AudioGallery baseFolder={folder} currentAppointment={currentAppointment} />,
@@ -436,7 +436,7 @@ const PatientOverview: React.FC = () => {
             key,
             label: (
               <>
-                <ExperimentOutlined /> {t(tab.folder)}
+                <ExperimentOutlined /> {tab.name}
               </>
             ),
             children: <TestTab baseFolder={folder} currentAppointment={currentAppointment} />,
@@ -460,7 +460,7 @@ const PatientOverview: React.FC = () => {
           key,
           label: (
             <>
-              <VideoCameraOutlined /> {t(tab.folder)}
+              <VideoCameraOutlined /> {tab.name}
             </>
           ),
           children: <VideoGallery baseFolder={folder} currentAppointment={currentAppointment} />,
@@ -470,7 +470,7 @@ const PatientOverview: React.FC = () => {
           key,
           label: (
             <>
-              <AudioOutlined /> {t(tab.folder)}
+              <AudioOutlined /> {tab.name}
             </>
           ),
           children: <AudioGallery baseFolder={folder} currentAppointment={currentAppointment} />,
@@ -480,7 +480,7 @@ const PatientOverview: React.FC = () => {
           key,
           label: (
             <>
-              <ExperimentOutlined /> {t(tab.folder)}
+              <ExperimentOutlined /> {tab.name}
             </>
           ),
           children: <TestTab baseFolder={folder} currentAppointment={currentAppointment} />,
@@ -509,7 +509,7 @@ const PatientOverview: React.FC = () => {
             title={
               <>
                 <div style={{ marginTop: 8 }}>
-                  <Tooltip title={patientMeta.patientCard ? "Відкрити картку пацієнта" : ""}>
+                  <Tooltip title={patientMeta.patientCard ? t('patientOverview.openPatientCard') : ""}>
                     <Title 
                       level={3} 
                       style={{ 
@@ -524,10 +524,10 @@ const PatientOverview: React.FC = () => {
                 </div>
                 
                 <Descriptions column={1} size="small" className="patient-header-descriptions" style={{ marginBottom: 4 }}>
-                  <Descriptions.Item label="Дата народження" style={{ paddingBottom: 0 }}>
+                  <Descriptions.Item label={t('patientOverview.birthDate')} style={{ paddingBottom: 0 }}>
                     {fmt(dob)}
                   </Descriptions.Item>
-                  <Descriptions.Item label="Статус картки">
+                  <Descriptions.Item label={t('patientOverview.cardStatus')}>
                     {(() => {
                       const isActive = patientMeta.statusId === 1;
                       const statusMenuItems: MenuProps['items'] = patientStatuses
@@ -559,14 +559,14 @@ const PatientOverview: React.FC = () => {
             }
             extra={
               <Space direction="vertical" size="small">
-                <Tooltip title="Редагувати">
+                <Tooltip title={t('patientOverview.editPatient')}>
                   <Button 
                     type="text" 
                     icon={<EditOutlined />} 
                     onClick={handleOpenRenameModal}
                   />
                 </Tooltip>
-                <Tooltip title="Об'єднати пацієнтів">
+                <Tooltip title={t('patientOverview.mergePatients')}>
                   <Button 
                     type="text" 
                     icon={<MergeCellsOutlined />} 
@@ -577,24 +577,24 @@ const PatientOverview: React.FC = () => {
             }
           >
             <Form layout="vertical">
-              <Form.Item label="Ведучий лікар">
+              <Form.Item label={t('patientOverview.primaryDoctor')}>
                 <CreatableSelect
                   value={form.doctor || null}
                   items={Array.isArray(doctors) ? doctors : []}
                   onChange={(val) => updateField({ doctor: val || "" })}
                   onCreate={handleDoctorCreate}
-                  placeholder="Обрати або додати лікаря..."
+                  placeholder={t('patientOverview.selectOrAddDoctor')}
                   style={{ width: '100%' }}
                 />
               </Form.Item>
 
-              <Form.Item label="Основний діагноз">
+              <Form.Item label={t('patientOverview.primaryDiagnosis')}>
                 <CreatableSelect
                   value={form.diagnosis || null}
                   items={Array.isArray(diagnoses) ? diagnoses : []}
                   onChange={(val) => updateField({ diagnosis: val || "" })}
                   onCreate={handleDiagnosisCreate}
-                  placeholder="Обрати або додати діагноз..."
+                  placeholder={t('patientOverview.selectOrAddDiagnosis')}
                   style={{ width: '100%' }}
                 />
               </Form.Item>
@@ -604,7 +604,7 @@ const PatientOverview: React.FC = () => {
             <div style={{ marginTop: 16 }}>
               <div style={{ marginBottom: 8, fontWeight: 500 }}>
                 <CalendarOutlined style={{ marginRight: 8 }} />
-                Список прийомів
+                {t('patientOverview.appointmentsList')}
               </div>
               
               <Button
@@ -613,7 +613,7 @@ const PatientOverview: React.FC = () => {
                 onClick={() => setAddAppointmentModalVisible(true)}
                 style={{ width: '100%', marginBottom: 8 }}
               >
-                Створити новий прийом
+                {t('patientOverview.createNewAppointment')}
               </Button>
 
               {patientMeta.appointments && patientMeta.appointments.length > 0 ? (
@@ -634,7 +634,7 @@ const PatientOverview: React.FC = () => {
                 />
               ) : (
                 <div style={{ textAlign: 'center', color: '#999', padding: '16px 0' }}>
-                  Немає прийомів
+                  {t('patientOverview.noAppointments')}
                 </div>
               )}
             </div>
@@ -645,11 +645,11 @@ const PatientOverview: React.FC = () => {
           {currentAppointment && (
             <Card
               loading={currentAppointmentLoading}
-              title={`Прийом ${fmt(currentAppointment)}`}
+              title={`${t('patientOverview.appointment')} ${fmt(currentAppointment)}`}
               style={{ marginTop: 16 }}
             >
               <Form layout="vertical">
-                <Form.Item label="Лікарі на прийомі">
+                <Form.Item label={t('patientOverview.doctorsAtAppointment')}>
                   <Select
                     mode="tags"
                     value={currentAppointmentForm.doctors || []}
@@ -662,28 +662,28 @@ const PatientOverview: React.FC = () => {
                       }
                       updateAppointmentField({ doctors: val || [] });
                     }}
-                    placeholder="Обрати або додати лікаря..."
+                    placeholder={t('patientOverview.selectOrAddDoctor')}
                     style={{ width: '100%' }}
                   />
                 </Form.Item>
 
-                <Form.Item label="Діагноз станом на дату прийому">
+                <Form.Item label={t('patientOverview.diagnosisAtAppointment')}>
                   <CreatableSelect
                     value={currentAppointmentForm.diagnosis || null}
                     items={Array.isArray(diagnoses) ? diagnoses : []}
                     onChange={(val) => updateAppointmentField({ diagnosis: val || "" })}
                     onCreate={handleDiagnosisCreate}
-                    placeholder="Обрати або додати діагноз..."
+                    placeholder={t('patientOverview.selectOrAddDiagnosis')}
                     style={{ width: '100%' }}
                   />
                 </Form.Item>
 
-                <Form.Item label="Нотатки">
+                <Form.Item label={t('patientOverview.notes')}>
                   <Input.TextArea
                     rows={4}
                     value={currentAppointmentForm.notes}
                     onChange={(e) => updateAppointmentField({ notes: e.target.value })}
-                    placeholder="Нотатки про прийом..."
+                    placeholder={t('patientOverview.notesPlaceholder')}
                   />
                 </Form.Item>
 
@@ -717,30 +717,30 @@ const PatientOverview: React.FC = () => {
       
       {/* Rename Modal */}
       <Modal
-        title="Перейменувати пацієнта"
+        title={t('patientOverview.renameModal.title')}
         open={renameModalVisible}
         onCancel={() => setRenameModalVisible(false)}
         onOk={handleRenameSubmit}
-        okText="Зберегти"
-        cancelText="Скасувати"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
         confirmLoading={renameLoading}
       >
         <Form layout="vertical">
-          <Form.Item label="Прізвище" required>
+          <Form.Item label={t('patientOverview.renameModal.surname')} required>
             <Input
               value={renameForm.surname}
               onChange={(e) => setRenameForm(prev => ({ ...prev, surname: e.target.value }))}
-              placeholder="Прізвище"
+              placeholder={t('patientOverview.renameModal.surname')}
             />
           </Form.Item>
-          <Form.Item label="Ім'я" required>
+          <Form.Item label={t('patientOverview.renameModal.name')} required>
             <Input
               value={renameForm.name}
               onChange={(e) => setRenameForm(prev => ({ ...prev, name: e.target.value }))}
-              placeholder="Ім'я"
+              placeholder={t('patientOverview.renameModal.name')}
             />
           </Form.Item>
-          <Form.Item label="Дата народження" required>
+          <Form.Item label={t('patientOverview.renameModal.birthdate')} required>
             <DatePicker
               value={renameForm.birthdate ? dayjs(renameForm.birthdate) : null}
               onChange={(date) => setRenameForm(prev => ({ 
@@ -749,7 +749,7 @@ const PatientOverview: React.FC = () => {
               }))}
               format="DD.MM.YYYY"
               style={{ width: '100%' }}
-              placeholder="Оберіть дату"
+              placeholder={t('patientOverview.renameModal.selectDate')}
             />
           </Form.Item>
           {renameError && (

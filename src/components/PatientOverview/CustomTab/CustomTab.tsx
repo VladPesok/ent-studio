@@ -4,6 +4,7 @@ import {
   PlusOutlined, 
   FolderOpenOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import * as patientsApi from '../../../helpers/patientsApi';
 import { getFileIconByExtension } from '../../../helpers/fileTypeHelper';
 import './CustomTab.css';
@@ -25,6 +26,7 @@ interface CustomFile {
 }
 
 const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, currentAppointment }) => {
+  const { t } = useTranslation();
   const [files, setFiles] = useState<CustomFile[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -45,7 +47,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
   const loadFiles = async () => {
     setLoading(true);
     try {
-      const customFiles = await patientsApi.getCustomTabFiles(baseFolder, tabName, currentAppointment);
+      const customFiles = await patientsApi.getCustomTabFiles(baseFolder, tabFolder, currentAppointment);
       setFiles((customFiles || []).map((file: CustomFile) => ({
         ...file,
         type: file.extension.substring(1)
@@ -60,14 +62,14 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
 
   const handleAddFiles = async () => {
     try {      
-      const result = await patientsApi.selectAndCopyFiles(baseFolder, tabName, currentAppointment);
+      const result = await patientsApi.selectAndCopyFiles(baseFolder, tabFolder, currentAppointment);
       if (result.success && result.count > 0) {
-        message.success(`Додано ${result.count} файл(ів)`);
+        message.success(t('customTab.messages.filesAdded', { count: result.count }));
         loadFiles();
       }
     } catch (error) {
       console.error("Failed to add files:", error);
-      message.error("Помилка додавання файлів");
+      message.error(t('customTab.messages.addError'));
     }
   };
 
@@ -80,7 +82,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
       await patientsApi.openPatientFolderInFs(folderPath);
     } catch (error) {
       console.error("Failed to open folder:", error);
-      message.error("Помилка відкриття папки");
+      message.error(t('customTab.messages.folderError'));
     }
   };
 
@@ -89,7 +91,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
       await patientsApi.openFileInDefaultApp(filePath);
     } catch (error) {
       console.error("Failed to open file:", error);
-      message.error("Помилка відкриття файлу");
+      message.error(t('customTab.messages.fileError'));
     }
   };
 
@@ -98,7 +100,7 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
       <div className="custom-tab-wrap">
         <div className="loading-state">
           <div className="loading-spinner"></div>
-          <p>Завантаження файлів...</p>
+          <p>{t('customTab.loadingFiles')}</p>
         </div>
       </div>
     );
@@ -109,21 +111,21 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
       <div className="custom-tab-empty-wrap">
         <div className="empty-state">
           <div className="empty-icon">📁</div>
-          <h3>Немає файлів</h3>
-          <p>Додайте файли до папки "{tabName}"</p>
+          <h3>{t('customTab.noFiles')}</h3>
+          <p>{t('customTab.addFilesHint', { tabName })}</p>
           <Space>
             <Button 
               type="primary" 
               icon={<PlusOutlined />} 
               onClick={handleAddFiles}
             >
-              Додати файли
+              {t('customTab.addFiles')}
             </Button>
             <Button 
               icon={<FolderOpenOutlined />} 
               onClick={handleOpenFolder}
             >
-              Відкрити папку
+              {t('customTab.openFolder')}
             </Button>
           </Space>
         </div>
@@ -144,13 +146,13 @@ const CustomTab: React.FC<CustomTabProps> = ({ baseFolder, tabFolder, tabName, c
               icon={<PlusOutlined />} 
               onClick={handleAddFiles}
             >
-              Додати файли
+              {t('customTab.addFiles')}
             </Button>
             <Button 
               icon={<FolderOpenOutlined />} 
               onClick={handleOpenFolder}
             >
-              Відкрити папку
+              {t('customTab.openFolder')}
             </Button>
           </Space>
         </div>

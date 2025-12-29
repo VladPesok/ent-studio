@@ -57,24 +57,24 @@ const TestTaker: React.FC<TestTakerProps> = ({
       <div className="test-result-content">
         <div className="result-header">
           <CheckCircleOutlined className="result-icon success" />
-          <Title level={4}>Тест завершено!</Title>
+          <Title level={4}>{t('testTaker.testCompleted')}</Title>
         </div>
         
         <div className="result-details">
           <div className="result-item">
-            <Text strong>Загальний бал: </Text>
+            <Text strong>{t('testTaker.totalScore')} </Text>
             <Text>{result.score}</Text>
           </div>
           
           {result.diagnosis && (
             <div className="result-item">
-              <Text strong>Діагноз: </Text>
+              <Text strong>{t('testTaker.diagnosis')} </Text>
               <Text>{result.diagnosis}</Text>
             </div>
           )}
           
           <div className="result-item">
-            <Text strong>Завершено: </Text>
+            <Text strong>{t('testTaker.completedAt')} </Text>
             <Text>{new Date(result.completedAt!).toLocaleDateString('uk-UA', {
               year: 'numeric',
               month: '2-digit',
@@ -87,10 +87,10 @@ const TestTaker: React.FC<TestTakerProps> = ({
 
         <div className="result-actions">
           <Button onClick={onCancel} style={{ marginRight: '12px' }}>
-            Закрити
+            {t('common.close')}
           </Button>
           <Button type="primary" onClick={handleRestartTest}>
-            Пройти тест знову
+            {t('testTaker.takeTestAgain')}
           </Button>
         </div>
       </div>
@@ -117,7 +117,7 @@ const TestTaker: React.FC<TestTakerProps> = ({
             {patientTest.testName}
           </Title>
           <Text type="secondary">
-            {showingResult ? 'Результати тесту' : 'Проходження тесту'}
+            {showingResult ? t('testTaker.testResults') : t('testTaker.takingTest')}
           </Text>
         </div>
       }

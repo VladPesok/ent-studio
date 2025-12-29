@@ -42,12 +42,11 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
         patientTestsApi.getPatientTests(baseFolder, currentAppointment),
         testApi.getTests()
       ]);
-      console.log({availableTestsData});
       setPatientTests(patientTestsData);
       setAvailableTests(availableTestsData);
     } catch (error) {
       console.error('Error loading test data:', error);
-      message.error('Помилка завантаження тестів');
+      message.error(t('testTab.messages.loadError'));
     } finally {
       setLoading(false);
     }
@@ -55,20 +54,20 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
 
   const handleAddTest = async () => {
     if (!selectedTestId) {
-      message.warning('Будь ласка, оберіть тест для додавання');
+      message.warning(t('testTab.messages.selectTest'));
       return;
     }
 
     const selectedTest = availableTests.find(test => test.id === selectedTestId);
     if (!selectedTest) {
-      message.error('Обраний тест не знайдено');
+      message.error(t('testTab.messages.testNotFound'));
       return;
     }
 
     // Check if test already exists for this appointment
     const existingTest = patientTests.find(pt => pt.testId === selectedTestId);
     if (existingTest) {
-      message.warning('Цей тест вже додано до поточного прийому');
+      message.warning(t('testTab.messages.testAlreadyAdded'));
       return;
     }
 
@@ -81,10 +80,10 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
       );
       setPatientTests(prev => [newPatientTest, ...prev]);
       setSelectedTestId('');
-      message.success('Тест успішно додано');
+      message.success(t('testTab.messages.testAdded'));
     } catch (error) {
       console.error('Error adding test:', error);
-      message.error('Помилка додавання тесту');
+      message.error(t('testTab.messages.addError'));
     }
   };
 
@@ -112,10 +111,10 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
         setCurrentTestTaking(updatedTest);
       }
       
-      message.success('Тест скинуто. Можна проходити знову.');
+      message.success(t('testTab.messages.testReset'));
     } catch (error) {
       console.error('Error restarting test:', error);
-      message.error('Помилка перезапуску тесту');
+      message.error(t('testTab.messages.resetError'));
     }
   };
 
@@ -123,24 +122,24 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
     // Refresh the test list
     await loadData();
     setCurrentTestTaking(null);
-    message.success('Тест успішно завершено!');
+    message.success(t('testTab.messages.testCompleted'));
   };
 
   const handleDeleteTest = async (patientTestId: string) => {
     Modal.confirm({
-      title: 'Видалити тест?',
-      content: 'Ви впевнені, що хочете видалити цей тест? Всі дані будуть втрачені.',
-      okText: 'Видалити',
+      title: t('testTab.deleteConfirm.title'),
+      content: t('testTab.deleteConfirm.message'),
+      okText: t('common.delete'),
       okType: 'danger',
-      cancelText: 'Скасувати',
+      cancelText: t('common.cancel'),
       onOk: async () => {
         try {
           await patientTestsApi.deletePatientTest(baseFolder, currentAppointment, patientTestId);
           setPatientTests(prev => prev.filter(pt => pt.id !== patientTestId));
-          message.success('Тест видалено');
+          message.success(t('testTab.messages.deleteSuccess'));
         } catch (error) {
           console.error('Error deleting test:', error);
-          message.error('Помилка видалення тесту');
+          message.error(t('testTab.messages.deleteError'));
         }
       }
     });
@@ -168,12 +167,12 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
 
   const getTestStatusText = (test: PatientTest) => {
     if (test.progress?.completed) {
-      return 'Завершено';
+      return t('testTab.completed');
     }
     if ((test.progress?.answers?.length ?? 0) > 0) {
-      return 'В процесі';
+      return t('testTab.inProgress');
     }
-    return 'Не розпочато';
+    return t('testTab.notStarted');
   };
 
   // Filter available tests to exclude already added ones
@@ -235,7 +234,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
       <div className="test-tab-wrap">
         <div className="loading-state">
           <div className="loading-spinner"></div>
-          <p>Завантаження тестів...</p>
+          <p>{t('testTab.loadingTests')}</p>
         </div>
       </div>
     );
@@ -246,14 +245,14 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
       <div className="test-tab-empty-wrap">
         <div className="empty-state">
           <div className="empty-icon">📋</div>
-          <h3>Немає тестів</h3>
-          <p>Додайте тест для проходження пацієнтом</p>
+          <h3>{t('testTab.noTests')}</h3>
+          <p>{t('testTab.addTestHint')}</p>
           
           {filteredAvailableTests.length > 0 ? (
             <Space direction="vertical" style={{ width: '100%', maxWidth: 400 }}>
               <Select
                 style={{ width: '100%' }}
-                placeholder="Оберіть тест для додавання..."
+                placeholder={t('testTab.selectTestPlaceholder')}
                 value={selectedTestId || undefined}
                 onChange={setSelectedTestId}
                 options={getTestSelectOptions()}
@@ -265,12 +264,12 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
                 disabled={!selectedTestId}
                 style={{ width: '100%' }}
               >
-                Додати тест
+                {t('testTab.addTest')}
               </Button>
             </Space>
           ) : (
             <p style={{ color: '#8c8c8c', marginTop: 16 }}>
-              Немає доступних тестів. Створіть тести в конструкторі тестів.
+              {t('testTab.noAvailableTests')}
             </p>
           )}
         </div>
@@ -282,7 +281,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
     <div className="test-tab-wrap">
       <div className="test-tab-header">
         <div className="tab-info">
-          <h3>Тести ({patientTests.length})</h3>
+          <h3>{t('testTab.tests')} ({patientTests.length})</h3>
         </div>
         
         {filteredAvailableTests.length > 0 && (
@@ -290,7 +289,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
             <Space>
               <Select
                 style={{ width: 250 }}
-                placeholder="Оберіть тест для додавання..."
+                placeholder={t('testTab.selectTestPlaceholder')}
                 value={selectedTestId || undefined}
                 onChange={setSelectedTestId}
                 options={getTestSelectOptions()}
@@ -301,7 +300,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
                 onClick={handleAddTest}
                 disabled={!selectedTestId}
               >
-                Додати тест
+                {t('testTab.addTest')}
               </Button>
             </Space>
           </div>
@@ -313,7 +312,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
           const progress = patientTestsApi.getTestProgress(patientTest);
           
           return (
-            <Card
+                <Card
               key={patientTest.id}
               className="test-card"
               actions={[
@@ -323,7 +322,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
                   icon={getTestStatusIcon(patientTest)}
                   onClick={() => handleStartTest(patientTest)}
                 >
-                  {patientTest.progress?.completed ? 'Переглянути' : 'Пройти тест'}
+                  {patientTest.progress?.completed ? t('testTab.view') : t('testTab.takeTest')}
                 </Button>,
                 ...(patientTest.progress?.completed ? [
                   <Button
@@ -332,7 +331,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
                     icon={<ReloadOutlined />}
                     onClick={() => handleRestartTest(patientTest)}
                   >
-                    Пройти знову
+                    {t('testTab.takeAgain')}
                   </Button>
                 ] : []),
                 <Button
@@ -342,7 +341,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
                   icon={<DeleteOutlined />}
                   onClick={() => handleDeleteTest(patientTest.id)}
                 >
-                  Видалити
+                  {t('common.delete')}
                 </Button>
               ]}
             >
@@ -359,11 +358,11 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
 
                 <div className="test-card-meta">
                   <Text type="secondary">
-                    Додано: {formatDate(patientTest.createdAt)}
+                    {t('testTab.added')} {formatDate(patientTest.createdAt)}
                   </Text>
                   {patientTest.progress?.completedAt && (
                     <Text type="secondary">
-                      Завершено: {formatDate(patientTest.progress.completedAt)}
+                      {t('testTab.completedAt')} {formatDate(patientTest.progress.completedAt)}
                     </Text>
                   )}
                 </div>
@@ -371,7 +370,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
                 <div className="test-card-progress">
                   <div className="progress-info">
                     <Text>
-                      Прогрес: {progress.answeredQuestions} з {progress.totalQuestions} питань
+                      {t('testTab.progress', { answered: progress.answeredQuestions, total: progress.totalQuestions })}
                     </Text>
                     <Text type="secondary">
                       {progress.progressPercentage}%
@@ -386,7 +385,7 @@ const TestTab: React.FC<TestTabProps> = ({ baseFolder, currentAppointment }) => 
 
                 {patientTest.progress?.completed && patientTest.progress?.diagnosis && (
                   <div className="test-card-result">
-                    <Text strong>Результат: </Text>
+                    <Text strong>{t('testTab.result')} </Text>
                     <Text>{patientTest.progress.diagnosis}</Text>
                   </div>
                 )}

@@ -1,14 +1,15 @@
 import React, { useState, useContext } from 'react';
 import { Card, Button, List, Space, Typography, message, Empty, Select, Form, Popconfirm } from 'antd';
 import { PlusOutlined, FileTextOutlined, StarOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import ImportPatientCardModal from './ImportPatientCardModal';
 import { AppConfigContext, PatientCard } from '../../../holders/AppConfig';
-import * as configApi from '../../../helpers/configApi';
 import * as patientsApi from '../../../helpers/patientsApi';
 
 const { Paragraph } = Typography;
 
 const PatientCards: React.FC = () => {
+  const { t } = useTranslation();
   const {
     patientCards,
     defaultPatientCard,
@@ -23,13 +24,13 @@ const PatientCards: React.FC = () => {
     try {
       const result = await importPatientCard(cardName, file);
       if (result.success) {
-        message.success('Картку пацієнта успішно імпортовано');
+        message.success(t('settings.patientCards.messages.importSuccess'));
       } else {
-        message.error(result.error || 'Помилка імпорту картки');
+        message.error(result.error || t('settings.patientCards.messages.importError'));
       }
     } catch (error) {
       console.error('Failed to import patient card:', error);
-      message.error('Помилка імпорту картки пацієнта');
+      message.error(t('settings.patientCards.messages.importError'));
     }
   };
 
@@ -38,17 +39,17 @@ const PatientCards: React.FC = () => {
       await patientsApi.openFileInDefaultApp(card.path);
     } catch (error) {
       console.error('Failed to open patient card:', error);
-      message.error('Помилка відкриття файлу');
+      message.error(t('settings.patientCards.messages.openError'));
     }
   };
 
   const handleDefaultCardChange = async (fileName: string | null) => {
     try {
       await setDefaultPatientCard(fileName);
-      message.success('Картку за замовчуванням змінено');
+      message.success(t('settings.patientCards.messages.defaultChanged'));
     } catch (error) {
       console.error('Failed to set default patient card:', error);
-      message.error('Помилка зміни картки за замовчуванням');
+      message.error(t('settings.patientCards.messages.defaultChangeError'));
     }
   };
 
@@ -57,13 +58,13 @@ const PatientCards: React.FC = () => {
       const cardFileName = card.name + card.extension;
       const result = await deletePatientCard(cardFileName);
       if (result.success) {
-        message.success('Картку пацієнта видалено');
+        message.success(t('settings.patientCards.messages.deleteSuccess'));
       } else {
-        message.error(result.error || 'Помилка видалення картки');
+        message.error(result.error || t('settings.patientCards.messages.deleteError'));
       }
     } catch (error) {
       console.error('Failed to delete patient card:', error);
-      message.error('Помилка видалення картки пацієнта');
+      message.error(t('settings.patientCards.messages.deleteError'));
     }
   };
 
@@ -93,10 +94,10 @@ const PatientCards: React.FC = () => {
   };
 
   return (
-    <Card title="Картки пацієнтів" style={{ marginBottom: 24 }}>
+    <Card title={t('settings.patientCards.title')} style={{ marginBottom: 24 }}>
       <Space direction="vertical" style={{ width: '100%' }}>
         <Paragraph type="secondary">
-          Імпортуйте документи-шаблони карток пацієнтів (DOC, DOCX, RTF файли) для подальшого використання
+          {t('settings.patientCards.description')}
         </Paragraph>
         
         <Button
@@ -105,18 +106,18 @@ const PatientCards: React.FC = () => {
           onClick={() => setImportModalVisible(true)}
           style={{ marginBottom: 16 }}
         >
-          Імпортувати картку
+          {t('settings.patientCards.importCard')}
         </Button>
 
         {patientCards.length >= 2 && (
           <Form layout="vertical" style={{ marginBottom: 16 }}>
             <Form.Item 
-              label="Картка пацієнта за замовчуванням"
-              help="Картка, яка буде використовуватися за замовчуванням. Якщо не обрано, використовується перша картка."
+              label={t('settings.patientCards.defaultCard')}
+              help={t('settings.patientCards.defaultCardHelp')}
             >
               <Select
                 style={{ width: '100%' }}
-                placeholder="Оберіть картку за замовчуванням..."
+                placeholder={t('settings.patientCards.defaultCardPlaceholder')}
                 value={defaultPatientCard}
                 onChange={handleDefaultCardChange}
                 allowClear
@@ -132,7 +133,7 @@ const PatientCards: React.FC = () => {
 
         {patientCards.length === 0 ? (
           <Empty
-            description="Немає імпортованих карток"
+            description={t('settings.patientCards.noCards')}
             style={{ margin: '20px 0' }}
           />
         ) : (
@@ -146,14 +147,14 @@ const PatientCards: React.FC = () => {
                     onClick={() => handleOpenCard(card)}
                     style={{ padding: 0 }}
                   >
-                    Відкрити
+                    {t('common.open')}
                   </Button>,
                   <Popconfirm
-                    title="Видалити картку?"
-                    description="Ця дія незворотна. Картку буде видалено назавжди."
+                    title={t('settings.patientCards.deleteConfirm.title')}
+                    description={t('settings.patientCards.deleteConfirm.description')}
                     onConfirm={() => handleDeleteCard(card)}
-                    okText="Видалити"
-                    cancelText="Скасувати"
+                    okText={t('common.delete')}
+                    cancelText={t('common.cancel')}
                     okType="danger"
                   >
                     <Button
@@ -162,7 +163,7 @@ const PatientCards: React.FC = () => {
                       icon={<DeleteOutlined />}
                       style={{ padding: 0 }}
                     >
-                      Видалити
+                      {t('common.delete')}
                     </Button>
                   </Popconfirm>
                 ]}
@@ -177,7 +178,7 @@ const PatientCards: React.FC = () => {
                       {isDefaultCard(card) && (
                         <StarOutlined 
                           style={{ color: '#faad14' }} 
-                          title="Картка за замовчуванням"
+                          title={t('settings.patientCards.defaultLabel')}
                         />
                       )}
                     </Space>
@@ -187,7 +188,7 @@ const PatientCards: React.FC = () => {
                       <span>{card.extension.toUpperCase()}</span>
                       <span>{formatFileSize(card.size)}</span>
                       <span>{formatDate(card.modified)}</span>
-                      {isDefaultCard(card) && <span style={{ color: '#faad14' }}>За замовчуванням</span>}
+                      {isDefaultCard(card) && <span style={{ color: '#faad14' }}>{t('settings.patientCards.defaultLabel')}</span>}
                     </Space>
                   }
                 />

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Collapse, Input, InputNumber, Button, Tooltip, Row, Col } from 'antd';
 import { DeleteOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { DiagnosisRange } from '../HandicapIndex';
 import './DiagnosisRangeCard.css';
 
@@ -21,6 +22,7 @@ const DiagnosisRangeCard: React.FC<DiagnosisRangeCardProps> = ({
   isExpanded,
   onExpandChange
 }) => {
+  const { t } = useTranslation();
   const [diagnosis, setDiagnosis] = useState(range.diagnosis);
   const [minScore, setMinScore] = useState(range.minScore);
   const [maxScore, setMaxScore] = useState(range.maxScore);
@@ -52,7 +54,7 @@ const DiagnosisRangeCard: React.FC<DiagnosisRangeCardProps> = ({
   };
 
   const getTitle = () => {
-    const baseTitle = "Діапазон діагнозу";
+    const baseTitle = t('testConstructor.handicapIndex.diagnosisRange');
     return diagnosis.trim() ? `${baseTitle}: ${diagnosis.trim()}` : baseTitle;
   };
 
@@ -71,7 +73,7 @@ const DiagnosisRangeCard: React.FC<DiagnosisRangeCardProps> = ({
           key="diagnosis"
           header={getTitle()}
           extra={
-            <Tooltip title="Видалити діапазон">
+            <Tooltip title={t('testConstructor.handicapIndex.deleteRange')}>
               <Button
                 type="text"
                 danger
@@ -89,11 +91,11 @@ const DiagnosisRangeCard: React.FC<DiagnosisRangeCardProps> = ({
         <Row gutter={16}>
           <Col span={24}>
             <div className="field-group">
-              <label className="field-label">Діагноз:</label>
+              <label className="field-label">{t('testConstructor.handicapIndex.diagnosis')}</label>
               <Input
                 value={diagnosis}
                 onChange={(e) => handleDiagnosisChange(e.target.value)}
-                placeholder="Введіть діагноз..."
+                placeholder={t('testConstructor.handicapIndex.enterDiagnosis')}
                 className="diagnosis-input"
               />
             </div>
@@ -103,7 +105,7 @@ const DiagnosisRangeCard: React.FC<DiagnosisRangeCardProps> = ({
         <Row gutter={16}>
           <Col span={12}>
             <div className="field-group">
-              <label className="field-label">Мін. бал:</label>
+              <label className="field-label">{t('testConstructor.handicapIndex.minScore')}</label>
               <InputNumber
                 value={minScore}
                 onChange={handleMinScoreChange}
@@ -116,7 +118,7 @@ const DiagnosisRangeCard: React.FC<DiagnosisRangeCardProps> = ({
           </Col>
           <Col span={12}>
             <div className="field-group">
-              <label className="field-label">Макс. бал:</label>
+              <label className="field-label">{t('testConstructor.handicapIndex.maxScore')}</label>
               <InputNumber
                 value={maxScore}
                 onChange={handleMaxScoreChange}
@@ -131,7 +133,7 @@ const DiagnosisRangeCard: React.FC<DiagnosisRangeCardProps> = ({
 
         {maxPossibleScore > 0 && (
           <div className="range-visualization">
-            <div className="range-label">Візуалізація діапазону:</div>
+            <div className="range-label">{t('testConstructor.handicapIndex.rangeVisualization')}</div>
             <div className="range-bar-container">
               <div className="range-bar-background">
                 <div 
@@ -149,7 +151,7 @@ const DiagnosisRangeCard: React.FC<DiagnosisRangeCardProps> = ({
             </div>
             <div className="range-info">
               <span className="range-text">
-                {minScore} - {maxScore} балів
+                {minScore} - {maxScore} {t('testConstructor.handicapIndex.pointsRange')}
                 {diagnosis && ` → ${diagnosis}`}
               </span>
             </div>
@@ -158,7 +160,7 @@ const DiagnosisRangeCard: React.FC<DiagnosisRangeCardProps> = ({
 
             {!isValidRange && (
               <div className="validation-error">
-                <span>⚠️ Некоректний діапазон балів</span>
+                <span>⚠️ {t('testConstructor.handicapIndex.invalidScoreRange')}</span>
               </div>
             )}
           </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Modal, Form, DatePicker, Input, Row, Col, Divider, Typography, Select } from 'antd';
 import { CalendarOutlined, MedicineBoxOutlined, FileTextOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import dayjs, { Dayjs } from 'dayjs';
 import 'dayjs/locale/uk';
 import CreatableSelect from '../../../common/input/CreatableSelect';
@@ -33,6 +34,7 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
   defaultDoctor,
   defaultDiagnosis,
 }) => {
+  const { t } = useTranslation();
   const { doctors, diagnoses, addDoctor, addDiagnosis } = useContext(AppConfigContext);
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -108,12 +110,12 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
       title={
         <div className="modal-header">
           <Title level={4} style={{ margin: 0 }}>
-            Новий прийом
+            {t('patientOverview.addAppointmentModal.title')}
           </Title>
         </div>
       }
-      okText="Створити"
-      cancelText="Скасувати"
+      okText={t('common.create')}
+      cancelText={t('common.cancel')}
       onCancel={handleCancel}
       onOk={handleOk}
       confirmLoading={loading}
@@ -128,19 +130,19 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
         >
           <div className="form-section">
             <Title level={5} className="section-title">
-              <CalendarOutlined /> Дата прийому
+              <CalendarOutlined /> {t('patientOverview.addAppointmentModal.appointmentDate')}
             </Title>
             
             <Form.Item
-              label="Дата прийому"
+              label={t('patientOverview.addAppointmentModal.appointmentDate')}
               name="date"
               rules={[
-                { required: true, message: 'Оберіть дату прийому' },
+                { required: true, message: t('patientOverview.addAppointmentModal.selectAppointmentDate') },
                 {
                   validator: (_, value) =>
                     value && value.isValid()
                       ? Promise.resolve()
-                      : Promise.reject('Невірний формат дати'),
+                      : Promise.reject(t('patientOverview.addAppointmentModal.invalidDateFormat')),
                 },
               ]}
             >
@@ -150,7 +152,7 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
                 style={{ width: '100%' }}
                 size="large"
                 disabledDate={disabledDate}
-                placeholder="Оберіть дату прийому"
+                placeholder={t('patientOverview.addAppointmentModal.selectAppointmentDate')}
               />
             </Form.Item>
           </div>
@@ -159,13 +161,13 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
 
           <div className="form-section">
             <Title level={5} className="section-title">
-              <MedicineBoxOutlined /> Медична інформація
+              <MedicineBoxOutlined /> {t('patientOverview.addAppointmentModal.medicalInfo')}
             </Title>
             
             <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
-                  label="Лікарі на прийомі"
+                  label={t('patientOverview.addAppointmentModal.doctorsAtAppointment')}
                   name="doctors"
                 >
                   <Select
@@ -181,7 +183,7 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
                       }
                     }}
                     options={doctors.map(doctor => ({ label: doctor, value: doctor }))}
-                    placeholder="Оберіть або введіть лікаря"
+                    placeholder={t('patientOverview.addAppointmentModal.selectOrEnterDoctor')}
                     style={{ width: '100%' }}
                   />
                 </Form.Item>
@@ -189,7 +191,7 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
               
               <Col span={12}>
                 <Form.Item
-                  label="Діагноз станом на дату прийому"
+                  label={t('patientOverview.addAppointmentModal.diagnosisAtDate')}
                   name="diagnosis"
                 >
                  <CreatableSelect
@@ -197,7 +199,7 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
                     onChange={(value) => form.setFieldsValue({ diagnosis: value })}
                     items={diagnoses}
                     onCreate={handleDiagnosisCreate}
-                    placeholder="Оберіть або введіть діагноз"
+                    placeholder={t('patientOverview.addAppointmentModal.selectOrEnterDiagnosis')}
                     style={{ width: '100%' }}
                   />
                 </Form.Item>
@@ -209,17 +211,17 @@ const AddAppointmentModal: React.FC<AddAppointmentModalProps> = ({
 
           <div className="form-section">
             <Title level={5} className="section-title">
-              <FileTextOutlined /> Додаткова інформація
-              <Text type="secondary" className="optional-label">(необов'язково)</Text>
+              <FileTextOutlined /> {t('patientOverview.addAppointmentModal.additionalInfo')}
+              <Text type="secondary" className="optional-label">{t('patientOverview.addAppointmentModal.optional')}</Text>
             </Title>
             
             <Form.Item
-              label="Примітки"
+              label={t('patientOverview.addAppointmentModal.notesLabel')}
               name="notes"
             >
               <Input.TextArea
                 rows={3}
-                placeholder="Додаткові примітки до прийому"
+                placeholder={t('patientOverview.addAppointmentModal.additionalNotes')}
                 style={{ borderRadius: '8px' }}
               />
             </Form.Item>

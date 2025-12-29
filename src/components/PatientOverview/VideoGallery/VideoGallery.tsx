@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Button, Space } from "antd";
 import { PlusOutlined, FolderOpenOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import "./VideoGallery.css";
 import { detectAudioInfo } from "./helpers/detectAudio";
 import * as patientsApi from "../../../helpers/patientsApi";
@@ -44,6 +45,7 @@ async function mapWithConcurrency<T, R>(
 }
 
 const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointment }) => {
+  const { t } = useTranslation();
   const [clips, setClips] = useState<VideoClip[]>([]);
   const [active, setActive] = useState<VideoClip | null>(null);
   const [loading, setLoading] = useState(false);
@@ -71,11 +73,11 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
 
   const getLabel = (clip: VideoClip): string => {
     if (clip.hasAudio) {
-      if (clip.isSilent === true) return "Відео";
-      if (clip.isSilent === false) return "Відео + Аудіо";
-      return "Відео + Аудіо (?)";
+      if (clip.isSilent === true) return t('videoGallery.video');
+      if (clip.isSilent === false) return t('videoGallery.videoWithAudio');
+      return `${t('videoGallery.videoWithAudio')} (?)`;
     }
-    return "Відео";
+    return t('videoGallery.video');
   };
 
   const getDuration = (element: HTMLVideoElement | HTMLAudioElement): string => {
@@ -211,7 +213,7 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
       <div className="gallery-wrap">
         <div className="loading-state">
           <div className="loading-spinner"></div>
-          <p>Завантаження відео...</p>
+          <p>{t('videoGallery.loadingVideos')}</p>
         </div>
       </div>
     );
@@ -222,21 +224,21 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
       <div className="gallery-empty-wrap">
         <div className="empty-state">
           <div className="empty-icon">🎬</div>
-          <h3>Немає відео файлів</h3>
-          <p>Додайте відео файли до цього прийому</p>
+          <h3>{t('videoGallery.noVideos')}</h3>
+          <p>{t('videoGallery.addVideosHint')}</p>
           <Space>
             <Button 
               type="primary" 
               icon={<PlusOutlined />} 
               onClick={handleLoadMoreVideos}
             >
-              Додати відео файли
+              {t('videoGallery.addVideoFiles')}
             </Button>
             <Button 
               icon={<FolderOpenOutlined />} 
               onClick={handleOpenVideoFolder}
             >
-              Відкрити папку
+              {t('videoGallery.openFolder')}
             </Button>
           </Space>
         </div>
@@ -248,7 +250,7 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
     <div className="gallery-wrap">
       <div className="gallery-header">
         <div className="gallery-info">
-          <h3>Відео матеріали ({total})</h3>
+          <h3>{t('videoGallery.videoMaterials')} ({total})</h3>
         </div>
         <div className="gallery-actions">
           <Space>
@@ -257,13 +259,13 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
               icon={<PlusOutlined />} 
               onClick={handleLoadMoreVideos}
             >
-              Додати файли
+              {t('videoGallery.addFiles')}
             </Button>
             <Button 
               icon={<FolderOpenOutlined />} 
               onClick={handleOpenVideoFolder}
             >
-              Відкрити папку
+              {t('videoGallery.openFolder')}
             </Button>
           </Space>
         </div>
@@ -345,10 +347,10 @@ const VideoGallery: React.FC<VideoGalleryProps> = ({ baseFolder, currentAppointm
             {loadingMore ? (
               <>
                 <div className="loading-spinner small"></div>
-                Завантаження...
+                {t('videoGallery.loading')}
               </>
             ) : (
-              `Завантажити ще (${total - clips.length} залишилось)`
+              t('videoGallery.loadMore', { remaining: total - clips.length })
             )}
           </button>
         </div>

@@ -5,6 +5,7 @@ import {
   FolderOpenOutlined, 
   CheckCircleOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { ColumnsType } from 'antd/es/table';
 import './StorageLocations.css';
 
@@ -19,7 +20,7 @@ interface StorageLocation {
   totalSize: number;
 }
 
-const formatBytes = (bytes: number): string => {
+const formatBytes = (bytes: number, t: (key: string) => string): string => {
   if (bytes === 0) return '0 Б';
   const k = 1024;
   const sizes = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
@@ -28,6 +29,7 @@ const formatBytes = (bytes: number): string => {
 };
 
 const StorageLocations: React.FC = () => {
+  const { t } = useTranslation();
   const [locations, setLocations] = useState<StorageLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
@@ -39,7 +41,7 @@ const StorageLocations: React.FC = () => {
       setLocations(data);
     } catch (error) {
       console.error('Failed to load storage locations:', error);
-      message.error('Помилка завантаження розташувань');
+      message.error(t('settings.storage.messages.loadError'));
     } finally {
       setLoading(false);
     }
@@ -54,14 +56,14 @@ const StorageLocations: React.FC = () => {
     try {
       const result = await window.ipcRenderer.invoke('db:storagePaths:add');
       if (result.success) {
-        message.success('Папку додано');
+        message.success(t('settings.storage.messages.folderAdded'));
         loadLocations();
       } else if (!result.canceled) {
-        message.error(result.error || 'Помилка додавання папки');
+        message.error(result.error || t('settings.storage.messages.folderAddError'));
       }
     } catch (error) {
       console.error('Failed to add location:', error);
-      message.error('Помилка додавання папки');
+      message.error(t('settings.storage.messages.folderAddError'));
     } finally {
       setActionLoading(null);
     }
@@ -71,11 +73,11 @@ const StorageLocations: React.FC = () => {
     setActionLoading(id);
     try {
       await window.ipcRenderer.invoke('db:storagePaths:setActive', id);
-      message.success('Активну папку змінено');
+      message.success(t('settings.storage.messages.activeFolderChanged'));
       loadLocations();
     } catch (error) {
       console.error('Failed to set active location:', error);
-      message.error('Помилка зміни активної папки');
+      message.error(t('settings.storage.messages.activeFolderError'));
     } finally {
       setActionLoading(null);
     }
@@ -86,13 +88,13 @@ const StorageLocations: React.FC = () => {
       await window.ipcRenderer.invoke('db:storagePaths:openInExplorer', path);
     } catch (error) {
       console.error('Failed to open folder:', error);
-      message.error('Помилка відкриття папки');
+      message.error(t('settings.storage.messages.openFolderError'));
     }
   };
 
   const columns: ColumnsType<StorageLocation> = [
     {
-      title: 'Шлях',
+      title: t('settings.storage.columns.path'),
       dataIndex: 'path',
       key: 'path',
       ellipsis: true,
@@ -110,7 +112,7 @@ const StorageLocations: React.FC = () => {
               {path}
             </Text>
           </Tooltip>
-          <Tooltip title="Відкрити в провіднику">
+          <Tooltip title={t('settings.storage.openInExplorer')}>
             <Button
               type="text"
               size="small"
@@ -122,7 +124,7 @@ const StorageLocations: React.FC = () => {
       ),
     },
     {
-      title: 'Пацієнтів',
+      title: t('settings.storage.columns.patientCount'),
       dataIndex: 'patientCount',
       key: 'patientCount',
       width: 120,
@@ -130,35 +132,35 @@ const StorageLocations: React.FC = () => {
       render: (count: number) => count,
     },
     {
-      title: 'Розмір',
+      title: t('settings.storage.columns.size'),
       dataIndex: 'totalSize',
       key: 'totalSize',
       width: 120,
       align: 'right',
-      render: (size: number) => formatBytes(size),
+      render: (size: number) => formatBytes(size, t),
     },
     {
-      title: 'Статус',
+      title: t('settings.storage.columns.status'),
       dataIndex: 'isActive',
       key: 'status',
       width: 130,
       align: 'center',
       render: (isActive: boolean) => (
         isActive ? (
-          <Tag color="green" icon={<CheckCircleOutlined />}>Активна</Tag>
+          <Tag color="green" icon={<CheckCircleOutlined />}>{t('settings.storage.statuses.active')}</Tag>
         ) : (
-          <Tag color="default">Неактивна</Tag>
+          <Tag color="default">{t('settings.storage.statuses.inactive')}</Tag>
         )
       ),
     },
     {
-      title: 'Дії',
+      title: t('settings.storage.columns.actions'),
       key: 'actions',
       width: 130,
       align: 'center',
       render: (_, record) => (
         !record.isActive ? (
-          <Tooltip title="Зробити активною">
+          <Tooltip title={t('settings.storage.makeActive')}>
             <Button
               type="primary"
               size="small"
@@ -166,7 +168,7 @@ const StorageLocations: React.FC = () => {
               onClick={() => handleSetActive(record.id)}
               loading={actionLoading === record.id}
             >
-              Активувати
+              {t('settings.storage.activate')}
             </Button>
           </Tooltip>
         ) : null
@@ -176,7 +178,7 @@ const StorageLocations: React.FC = () => {
 
   return (
     <Card 
-      title="Розташування даних пацієнтів" 
+      title={t('settings.storage.title')} 
       style={{ marginBottom: 24 }}
       extra={
         <Button
@@ -185,7 +187,7 @@ const StorageLocations: React.FC = () => {
           onClick={handleAddLocation}
           loading={actionLoading === -1}
         >
-          Додати папку
+          {t('settings.storage.addFolder')}
         </Button>
       }
     >
@@ -195,16 +197,14 @@ const StorageLocations: React.FC = () => {
         rowKey="id"
         loading={loading}
         pagination={false}
-        locale={{ emptyText: 'Немає налаштованих розташувань' }}
+        locale={{ emptyText: t('settings.storage.emptyLocations') }}
       />
       
       <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
-        <strong>Примітка:</strong> Нові пацієнти будуть створюватися в активній папці. 
-        Існуючі пацієнти залишаться у своїх папках.
+        <strong>{t('common.note')}</strong> {t('settings.storage.hint')}
       </Text>
     </Card>
   );
 };
 
 export default StorageLocations;
-

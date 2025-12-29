@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Collapse, Input, Button, Tooltip } from 'antd';
 import { DeleteOutlined, DragOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { Question, AnswerOption } from '../HandicapIndex';
 import './QuestionCard.css';
 
@@ -26,6 +27,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   isExpanded,
   onExpandChange
 }) => {
+  const { t } = useTranslation();
   const [text, setText] = useState(question.text);
 
   const handleTextChange = (value: string) => {
@@ -43,8 +45,14 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   };
 
   const getTitle = () => {
-    const baseTitle = `Питання ${index + 1}`;
+    const baseTitle = t('testConstructor.handicapIndex.questionN', { n: index + 1 });
     return text.trim() ? `${baseTitle}: ${text.trim()}` : baseTitle;
+  };
+
+  const getPointsLabel = (points: number) => {
+    if (points === 1) return t('testConstructor.handicapIndex.point');
+    if (points >= 2 && points <= 4) return t('testConstructor.handicapIndex.points_few');
+    return t('testConstructor.handicapIndex.points_many');
   };
 
   return (
@@ -63,7 +71,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             </div>
           }
           extra={
-            <Tooltip title="Видалити питання">
+            <Tooltip title={t('testConstructor.handicapIndex.deleteQuestion')}>
               <Button
                 type="text"
                 danger
@@ -81,20 +89,20 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             <TextArea
               value={text}
               onChange={(e) => handleTextChange(e.target.value)}
-              placeholder="Введіть текст питання..."
+              placeholder={t('testConstructor.handicapIndex.enterQuestionText')}
               rows={2}
               className="question-text-input"
             />
             
             <div className="question-preview">
-              <div className="preview-label">Попередній перегляд:</div>
+              <div className="preview-label">{t('testConstructor.handicapIndex.preview')}</div>
               <div className="preview-question">
-                {text || 'Текст питання буде відображено тут...'}
+                {text || t('testConstructor.handicapIndex.questionTextWillBeDisplayed')}
               </div>
               <div className="preview-answers">
-                {answerOptions.map((option, index) => (
-                  <div key={index} className="answer-option-preview">
-                    ◯ {option.text} ({option.points} {option.points === 1 ? 'бал' : option.points < 5 ? 'бали' : 'балів'})
+                {answerOptions.map((option, idx) => (
+                  <div key={idx} className="answer-option-preview">
+                    ◯ {option.text} ({option.points} {getPointsLabel(option.points)})
                   </div>
                 ))}
               </div>

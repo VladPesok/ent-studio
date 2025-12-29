@@ -10,6 +10,7 @@ import {
   Tooltip
 } from 'antd';
 import { PlusOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { Test } from '../../../TestConstructor';
 import QuestionCard from './components/QuestionCard';
 import DiagnosisRangeCard from './components/DiagnosisRangeCard';
@@ -56,6 +57,7 @@ interface HandicapIndexProps {
 }
 
 const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => {
+  const { t } = useTranslation();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [diagnosisRanges, setDiagnosisRanges] = useState<DiagnosisRange[]>([]);
   const [answerOptions, setAnswerOptions] = useState<AnswerOption[]>(DEFAULT_ANSWER_OPTIONS);
@@ -215,14 +217,14 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
   };
 
   const validateRanges = () => {
-    if (diagnosisRanges.length === 0) return { valid: false, message: 'Додайте хоча б один діапазон діагнозу' };
+    if (diagnosisRanges.length === 0) return { valid: false, message: t('testConstructor.handicapIndex.validation.addAtLeastOneRange') };
 
     const sortedRanges = [...diagnosisRanges].sort((a, b) => a.minScore - b.minScore);
     for (let i = 0; i < sortedRanges.length - 1; i++) {
       const current = sortedRanges[i];
       const next = sortedRanges[i + 1];
       if (current.maxScore >= next.minScore) {
-        return { valid: false, message: 'Діапазони не можуть перетинатися' };
+        return { valid: false, message: t('testConstructor.handicapIndex.validation.rangesCannotIntersect') };
       }
     }
 
@@ -230,11 +232,11 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
     const minScore = 0;
     
     if (sortedRanges[0].minScore > minScore) {
-      return { valid: false, message: `Діапазони повинні покривати мінімальний бал (${minScore})` };
+      return { valid: false, message: t('testConstructor.handicapIndex.validation.rangesMustCoverMin', { score: minScore }) };
     }
     
     if (sortedRanges[sortedRanges.length - 1].maxScore < maxScore) {
-      return { valid: false, message: `Діапазони повинні покривати максимальний бал (${maxScore})` };
+      return { valid: false, message: t('testConstructor.handicapIndex.validation.rangesMustCoverMax', { score: maxScore }) };
     }
 
     return { valid: true, message: '' };
@@ -251,9 +253,9 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
       <Collapse.Panel 
         header={
           <div className="panel-header">
-            <span className="panel-title">Варіанти відповідей ({answerOptions.length})</span>
+            <span className="panel-title">{t('testConstructor.handicapIndex.answerOptions')} ({answerOptions.length})</span>
             <Space>
-              <Tooltip title="Скинути до стандартних">
+              <Tooltip title={t('testConstructor.handicapIndex.resetToDefault')}>
                 <Button
                   size="small"
                   icon={<ReloadOutlined />}
@@ -276,9 +278,9 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
                 }}
                 style={{ width: '140px' }}
                 className="header-add-button"
-                title="Додати варіант"
+                title={t('testConstructor.handicapIndex.addOption')}
               >
-                <span className="button-text">Додати варіант</span>
+                <span className="button-text">{t('testConstructor.handicapIndex.addOption')}</span>
               </Button>
             </Space>
           </div>
@@ -287,7 +289,7 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
       >
         <div className="answer-options-manager">
           <p style={{ marginBottom: '16px', color: '#666' }}>
-            Налаштуйте варіанти відповідей, які будуть доступні для всіх питань цього тесту.
+            {t('testConstructor.handicapIndex.answerOptionsDescription')}
           </p>
           
           <div className="answer-options-list">
@@ -295,30 +297,30 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
               <div key={index} className="answer-option-item">
                 <div className="option-inputs">
                   <InputNumber
-                    placeholder="Бали"
+                    placeholder={t('testConstructor.handicapIndex.points')}
                     value={option.points}
                     onChange={(value) => updateAnswerOption(index, { points: value || 0 })}
                     min={0}
                     style={{ width: '100px' }}
                   />
                   <Input
-                    placeholder="Текст відповіді"
+                    placeholder={t('testConstructor.handicapIndex.answerText')}
                     value={option.text}
                     onChange={(e) => updateAnswerOption(index, { text: e.target.value })}
                     style={{ flex: 1 }}
                   />
                   <Popconfirm
-                    title="Видалити цей варіант відповіді?"
+                    title={t('testConstructor.handicapIndex.deleteOptionConfirm')}
                     onConfirm={() => deleteAnswerOption(index)}
-                    okText="Так"
-                    cancelText="Ні"
+                    okText={t('testConstructor.handicapIndex.yes')}
+                    cancelText={t('testConstructor.handicapIndex.no')}
                     disabled={answerOptions.length <= 1}
                   >
                     <Button
                       icon={<DeleteOutlined />}
                       danger
                       disabled={answerOptions.length <= 1}
-                      title={answerOptions.length <= 1 ? "Неможливо видалити останній варіант" : "Видалити варіант"}
+                      title={answerOptions.length <= 1 ? t('testConstructor.handicapIndex.cannotDeleteLast') : t('testConstructor.handicapIndex.deleteOption')}
                     />
                   </Popconfirm>
                 </div>
@@ -335,7 +337,7 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
               size="large"
               style={{ width: '500px' }}
             >
-              Додати варіант відповіді
+              {t('testConstructor.handicapIndex.addAnswerOption')}
             </Button>
           </div>
         </div>
@@ -344,7 +346,7 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
       <Collapse.Panel 
         header={
           <div className="panel-header">
-            <span className="panel-title">Питання ({questions.length})</span>
+            <span className="panel-title">{t('testConstructor.handicapIndex.questions')} ({questions.length})</span>
             <Button
               type="primary"
               size="small"
@@ -357,9 +359,9 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
               }}
               style={{ width: '140px' }}
               className="header-add-button"
-              title="Додати питання"
+              title={t('testConstructor.handicapIndex.addQuestion')}
             >
-              <span className="button-text">Додати питання</span>
+              <span className="button-text">{t('testConstructor.handicapIndex.addQuestion')}</span>
             </Button>
           </div>
         } 
@@ -389,7 +391,7 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
               size="large"
               style={{ width: '500px' }}
             >
-              {questions.length === 0 ? 'Додати перше питання' : 'Додати питання'}
+              {questions.length === 0 ? t('testConstructor.handicapIndex.addFirstQuestion') : t('testConstructor.handicapIndex.addQuestion')}
             </Button>
           </div>
         </div>
@@ -398,7 +400,7 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
       <Collapse.Panel 
         header={
           <div className="panel-header">
-            <span className="panel-title">Діапазони діагнозів ({diagnosisRanges.length})</span>
+            <span className="panel-title">{t('testConstructor.handicapIndex.diagnosisRanges')} ({diagnosisRanges.length})</span>
             <Button
               type="primary"
               size="small"
@@ -409,10 +411,10 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
                 addDiagnosisRange();
               }}
               className="header-add-button"
-              title="Додати діапазон"
+              title={t('testConstructor.handicapIndex.addRange')}
               style={{ width: '140px' }}
             >
-              <span className="button-text">Додати діапазон</span>
+              <span className="button-text">{t('testConstructor.handicapIndex.addRange')}</span>
             </Button>
           </div>
         } 
@@ -420,10 +422,10 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
       >
         <div className="score-info">
           <p>
-            Максимальний можливий бал: <strong>{maxPossibleScore}</strong>
+            {t('testConstructor.handicapIndex.maxPossibleScore')} <strong>{maxPossibleScore}</strong>
             {questions.length > 0 && (
               <span className="score-calculation">
-                ({questions.length} питань × {Math.max(...answerOptions.map(o => o.points))} балів)
+                {t('testConstructor.handicapIndex.scoreCalculation', { questions: questions.length, points: Math.max(...answerOptions.map(o => o.points)) })}
               </span>
             )}
           </p>
@@ -459,7 +461,7 @@ const HandicapIndex: React.FC<HandicapIndexProps> = ({ test, onDataChange }) => 
               size="large"
               style={{ width: '500px' }}
             >
-              {diagnosisRanges.length === 0 ? 'Додати перший діапазон' : 'Додати діапазон'}
+              {diagnosisRanges.length === 0 ? t('testConstructor.handicapIndex.addFirstRange') : t('testConstructor.handicapIndex.addRange')}
             </Button>
           </div>
         </div>

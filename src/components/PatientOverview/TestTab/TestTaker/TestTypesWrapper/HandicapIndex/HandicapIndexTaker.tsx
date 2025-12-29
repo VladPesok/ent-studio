@@ -5,6 +5,7 @@ import {
   ArrowRightOutlined, 
   CheckCircleOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import * as patientTestsApi from '../../../../../../helpers/patientTestsApi';
 import type { PatientTest, TestAnswer } from '../../../../../../helpers/patientTestsApi';
 import { DEFAULT_ANSWER_OPTIONS, type AnswerOption } from '../../../../../TestConstructor/TestEditor/TestTypesWrapper/HandicapIndex/HandicapIndex';
@@ -26,6 +27,7 @@ const HandicapIndexTaker: React.FC<HandicapIndexTakerProps> = ({
   onTestComplete,
   isRetaking = false
 }) => {
+  const { t } = useTranslation();
   // Initialize state based on whether we're retaking or continuing
   const initialQuestionIndex = isRetaking ? 0 : (patientTest.progress?.currentQuestionIndex ?? 0);
   const initialAnswers = isRetaking ? [] : (patientTest.progress?.answers ?? []);
@@ -74,7 +76,7 @@ const HandicapIndexTaker: React.FC<HandicapIndexTakerProps> = ({
       });
     } catch (error) {
       console.error('Error saving answer:', error);
-      message.error('Помилка збереження відповіді');
+      message.error(t('testTaker.messages.saveError'));
     } finally {
       setSaving(false);
     }
@@ -82,7 +84,7 @@ const HandicapIndexTaker: React.FC<HandicapIndexTakerProps> = ({
 
   const handleNextQuestion = async () => {
     if (selectedAnswer === null) {
-      message.warning('Будь ласка, оберіть відповідь');
+      message.warning(t('testTaker.messages.selectAnswer'));
       return;
     }
 
@@ -136,7 +138,7 @@ const HandicapIndexTaker: React.FC<HandicapIndexTakerProps> = ({
       onTestComplete(updatedTest);
     } catch (error) {
       console.error('Error completing test:', error);
-      message.error('Помилка завершення тесту');
+      message.error(t('testTaker.messages.completeError'));
     } finally {
       setSaving(false);
     }
@@ -165,7 +167,7 @@ const HandicapIndexTaker: React.FC<HandicapIndexTakerProps> = ({
       <div className="question-header">
         <div className="question-progress">
           <Text type="secondary" style={{ fontSize: '13px' }}>
-            Питання {currentQuestionIndex + 1} з {totalQuestions}
+            {t('testTaker.question', { current: currentQuestionIndex + 1, total: totalQuestions })}
           </Text>
           <Progress 
             percent={progressPercentage} 
@@ -203,7 +205,7 @@ const HandicapIndexTaker: React.FC<HandicapIndexTakerProps> = ({
             onClick={handlePreviousQuestion}
             disabled={currentQuestionIndex === 0 || saving}
           >
-            Попереднє
+            {t('testTaker.previous')}
           </Button>
           
           <Button
@@ -213,7 +215,7 @@ const HandicapIndexTaker: React.FC<HandicapIndexTakerProps> = ({
             disabled={selectedAnswer === null || saving}
             loading={saving}
           >
-            {isLastQuestion ? 'Завершити тест' : 'Наступне'}
+            {isLastQuestion ? t('testTaker.finishTest') : t('testTaker.next')}
           </Button>
         </Space>
       </div>

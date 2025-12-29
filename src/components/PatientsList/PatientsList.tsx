@@ -10,11 +10,13 @@ import {
   LoadingOutlined
 } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import AddCardModal from "./AddCardModal/AddCardModal";
 import type { ColumnsType } from "antd/es/table";
 import type { FilterDropdownProps } from "antd/es/table/interface";
 import * as patientsApi from "../../helpers/patientsApi";
 import { AppConfigContext } from "../../holders/AppConfig";
+import { saveTableState, loadTableState, TABLE_KEYS } from "../../helpers/tableStateHelper";
 import "./PatientsList.css";
 
 const { RangePicker } = DatePicker;
@@ -31,7 +33,8 @@ interface ImportProgress {
 }
 
 const PatientsList: React.FC = () => {
-  const { doctors, diagnoses } = useContext(AppConfigContext);
+  const { t } = useTranslation();
+  const { doctors, showSizeChanger } = useContext(AppConfigContext);
   const [patients, setPatients] = useState<patientsApi.Patient[]>([]);
   const [patientStatuses, setPatientStatuses] = useState<patientsApi.PatientStatus[]>([]);
 
@@ -62,15 +65,15 @@ const PatientsList: React.FC = () => {
     e.stopPropagation(); // Prevent row click
     try {
       await patientsApi.updatePatientStatus(folder, statusId);
-      message.success('Статус пацієнта оновлено');
+      message.success(t('patientsList.messages.statusUpdated'));
       reloadPatients();
     } catch (error) {
       console.error('Failed to update status:', error);
-      message.error('Помилка оновлення статусу');
+      message.error(t('patientsList.messages.statusUpdateError'));
     }
   };
 
-  const updateTableState = async (newState: Partial<patientsApi.TableState>) => {
+  const updateTableState = async (newState: Partial<patientsApi.TableState>, skipSave = false) => {
     const updatedState = { ...tableState, ...newState };
     setTableState(updatedState);
 
@@ -88,13 +91,25 @@ const PatientsList: React.FC = () => {
         pageSize: result.pageSize
       }
     }));
+
+    // Save table state (excluding search)
+    if (!skipSave) {
+      saveTableState(TABLE_KEYS.PATIENTS, {
+        pageSize: updatedState.pagination.pageSize,
+        filters: updatedState.filters,
+        sorter: updatedState.sorter.field ? {
+          field: updatedState.sorter.field,
+          order: updatedState.sorter.order,
+        } : undefined,
+      });
+    }
   };
 
   const getColumnSearchProps = (dataIndex: string, placeholder: string) => ({
     filterDropdown: ({ setSelectedKeys, selectedKeys, confirm, clearFilters }: FilterDropdownProps) => (
       <div style={{ padding: 8 }}>
         <Input
-          placeholder={`Пошук ${placeholder.toLowerCase()}`}
+          placeholder={t('patientsList.filters.searchFor', { placeholder: placeholder.toLowerCase() })}
           value={selectedKeys[0] || ''}
           onChange={(e) => setSelectedKeys(e.target.value ? [e.target.value] : [])}
           onPressEnter={() => confirm()}
@@ -108,7 +123,7 @@ const PatientsList: React.FC = () => {
             size="small"
             style={{ width: 90 }}
           >
-            Пошук
+            {t('patientsList.filters.search')}
           </Button>
           <Button
             onClick={() => {
@@ -119,7 +134,7 @@ const PatientsList: React.FC = () => {
             size="small"
             style={{ width: 90 }}
           >
-            Скинути
+            {t('patientsList.filters.reset')}
           </Button>
         </Space>
       </div>
@@ -136,7 +151,7 @@ const PatientsList: React.FC = () => {
           onChange={(dates) => setSelectedKeys(dates ? [dates as any] : [])}
           style={{ marginBottom: 8, width: '100%' }}
           format="DD.MM.YYYY"
-          placeholder={['Від дати', 'До дати']}
+          placeholder={[t('patientsList.filters.fromDate'), t('patientsList.filters.toDate')]}
           allowEmpty={[true, true]}
         />
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
@@ -146,7 +161,7 @@ const PatientsList: React.FC = () => {
             size="small"
             style={{ width: 90 }}
           >
-            Фільтр
+            {t('patientsList.filters.filter')}
           </Button>
           <Button
             onClick={() => {
@@ -157,7 +172,7 @@ const PatientsList: React.FC = () => {
             size="small"
             style={{ width: 90 }}
           >
-            Скинути
+            {t('patientsList.filters.reset')}
           </Button>
         </Space>
       </div>
@@ -171,7 +186,7 @@ const PatientsList: React.FC = () => {
       <div style={{ padding: 8, width: 250 }}>
         <Select
           mode="multiple"
-          placeholder="Оберіть варіанти"
+          placeholder={t('patientsList.filters.selectOptions')}
           value={selectedKeys.length > 0 ? selectedKeys : []}
           onChange={(values) => setSelectedKeys(values)}
           style={{ marginBottom: 8, width: '100%' }}
@@ -185,7 +200,7 @@ const PatientsList: React.FC = () => {
             size="small"
             style={{ width: 90 }}
           >
-            Фільтр
+            {t('patientsList.filters.filter')}
           </Button>
           <Button
             onClick={() => {
@@ -196,7 +211,7 @@ const PatientsList: React.FC = () => {
             size="small"
             style={{ width: 90 }}
           >
-            Скинути
+            {t('patientsList.filters.reset')}
           </Button>
         </Space>
       </div>
@@ -210,7 +225,7 @@ const PatientsList: React.FC = () => {
       <div style={{ padding: 8, width: 200 }}>
         <Select
           mode="multiple"
-          placeholder="Оберіть статус"
+          placeholder={t('patientsList.filters.selectStatus')}
           value={selectedKeys.length > 0 ? selectedKeys : []}
           onChange={(values) => setSelectedKeys(values)}
           style={{ marginBottom: 8, width: '100%' }}
@@ -224,7 +239,7 @@ const PatientsList: React.FC = () => {
             size="small"
             style={{ width: 90 }}
           >
-            Фільтр
+            {t('patientsList.filters.filter')}
           </Button>
           <Button
             onClick={() => {
@@ -235,7 +250,7 @@ const PatientsList: React.FC = () => {
             size="small"
             style={{ width: 90 }}
           >
-            Скинути
+            {t('patientsList.filters.reset')}
           </Button>
         </Space>
       </div>
@@ -244,9 +259,10 @@ const PatientsList: React.FC = () => {
     onFilter: () => true
   });
 
-  const reloadPatients = async () => {
-    const dbFilters = patientsApi.tableStateToDbFilters(tableState);
-    
+  const reloadPatients = async (state?: patientsApi.TableState) => {
+    const stateToUse = state || tableState;
+    const dbFilters = patientsApi.tableStateToDbFilters(stateToUse);
+
     const result = await patientsApi.getPatients(dbFilters);
     setPatients(result.data);
     setTableState(prev => ({
@@ -260,8 +276,31 @@ const PatientsList: React.FC = () => {
     }));
   };
 
+  // Load saved table state on mount
   useEffect(() => {
-    reloadPatients();
+    const initializeTableState = async () => {
+      const savedState = await loadTableState(TABLE_KEYS.PATIENTS);
+      if (savedState) {
+        const restoredState: patientsApi.TableState = {
+          pagination: { 
+            current: 1, 
+            pageSize: savedState.pageSize || 10, 
+            total: 0 
+          },
+          filters: savedState.filters || {},
+          sorter: savedState.sorter ? {
+            field: savedState.sorter.field,
+            order: savedState.sorter.order,
+          } : {},
+          search: ''
+        };
+        setTableState(restoredState);
+        reloadPatients(restoredState);
+      } else {
+        reloadPatients();
+      }
+    };
+    initializeTableState();
   }, []);
 
   // Listen for import progress events
@@ -322,13 +361,13 @@ const PatientsList: React.FC = () => {
   // Get active filters for display
   const getActiveFilters = () => {
     const activeFilters = [];
-    if (tableState.search) activeFilters.push(`Пошук: "${tableState.search}"`);
-    if (tableState.filters.name?.[0]) activeFilters.push(`Ім'я: "${tableState.filters.name[0]}"`);
-    if (tableState.filters.bithdate) activeFilters.push('Дата народження');
-    if (tableState.filters.appointmentDate) activeFilters.push('Дата прийому');
-    if (tableState.filters.doctor && tableState.filters.doctor.length > 0) activeFilters.push(`Лікарі: ${tableState.filters.doctor.length}`);
-    if (tableState.filters.diagnosis && tableState.filters.diagnosis.length > 0) activeFilters.push(`Діагноз: ${tableState.filters.diagnosis.length}`);
-    if (tableState.filters.status && tableState.filters.status.length > 0) activeFilters.push(`Статус: ${tableState.filters.status.length}`);
+    if (tableState.search) activeFilters.push(`${t('patientsList.activeFilterLabels.search')} "${tableState.search}"`);
+    if (tableState.filters.name?.[0]) activeFilters.push(`${t('patientsList.activeFilterLabels.name')} "${tableState.filters.name[0]}"`);
+    if (tableState.filters.bithdate) activeFilters.push(t('patientsList.activeFilterLabels.birthdate'));
+    if (tableState.filters.appointmentDate) activeFilters.push(t('patientsList.activeFilterLabels.appointmentDate'));
+    if (tableState.filters.doctor && tableState.filters.doctor.length > 0) activeFilters.push(`${t('patientsList.activeFilterLabels.doctors')} ${tableState.filters.doctor.length}`);
+    if (tableState.filters.diagnosis && tableState.filters.diagnosis.length > 0) activeFilters.push(`${t('patientsList.activeFilterLabels.diagnosis')} ${tableState.filters.diagnosis.length}`);
+    if (tableState.filters.status && tableState.filters.status.length > 0) activeFilters.push(`${t('patientsList.activeFilterLabels.status')} ${tableState.filters.status.length}`);
     return activeFilters;
   };
 
@@ -346,63 +385,69 @@ const PatientsList: React.FC = () => {
   
   const columns: ColumnsType<patientsApi.Patient & { key: string }> = [
     {
-      title: "Прізвище та ім'я",
+      title: t('patientsList.columns.name'),
       dataIndex: "name",
       key: "name",
       render: (name) => {
         return <span style={{cursor: 'pointer'}} className="patient-cell">{name}</span>;
       },
       sorter: true,
-      ...getColumnSearchProps('name', "Прізвище та ім'я"),
+      sortOrder: tableState.sorter.field === 'name' ? tableState.sorter.order : null,
+      ...getColumnSearchProps('name', t('patientsList.columns.name')),
     },
     {
-      title: "Дата народження",
+      title: t('patientsList.columns.birthdate'),
       dataIndex: "birthdate",
       key: "bithdate",
-      width: 240,
+      width: 220,
       render: (birthdate) => {
         if (!birthdate) return '';
         const date = new Date(birthdate);
         return date.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric' });
       },
       sorter: true,
+      sortOrder: tableState.sorter.field === 'birthdate' ? tableState.sorter.order : null,
       ...getDateRangeProps('bithdate') as any,
     },
     {
-      title: "Дата останнього прийому",
+      title: t('patientsList.columns.lastAppointment'),
       dataIndex: "latestAppointmentDate",
       key: "appointmentDate",
-      width: 240,
+      width: 220,
       render: (latestAppointmentDate) => {
         if (!latestAppointmentDate) return '';
         const dateObj = new Date(latestAppointmentDate);
         return dateObj.toLocaleDateString('uk-UA', { day: '2-digit', month: 'short', year: 'numeric' });
       },
       sorter: true,
+      sortOrder: tableState.sorter.field === 'latestAppointmentDate' ? tableState.sorter.order : null,
       ...getDateRangeProps('appointmentDate') as any,
     },
     {
-      title: "Ведучий лікар",
+      title: t('patientsList.columns.doctor'),
       dataIndex: "doctor",
       key: "doctor",
-      width: 240,
+      width: 220,
       sorter: true,
+      sortOrder: tableState.sorter.field === 'doctor' ? tableState.sorter.order : null,
       ...getSelectProps(doctors, 'doctor'),
     },
     {
-      title: "Основний діагноз",
+      title: t('patientsList.columns.diagnosis'),
       dataIndex: "diagnosis",
       key: "diagnosis",
-      width: 240,
+      width: 220,
       sorter: true,
-      ...getColumnSearchProps('diagnosis', "Основний діагноз"),
+      sortOrder: tableState.sorter.field === 'diagnosis' ? tableState.sorter.order : null,
+      ...getColumnSearchProps('diagnosis', t('patientsList.columns.diagnosis')),
     },
     {
-      title: "Статус",
+      title: t('patientsList.columns.status'),
       dataIndex: "statusName",
       key: "status",
-      width: 140,
+      width: 120,
       sorter: true,
+      sortOrder: tableState.sorter.field === 'statusName' ? tableState.sorter.order : null,
       render: (statusName, r) => {
         const isActive = r.statusId === 1;
         const statusMenuItems = patientStatuses
@@ -436,7 +481,7 @@ const PatientsList: React.FC = () => {
       key: "actions",
       width: 50,
       render: (_, r) => (
-        <Tooltip title="Відкрити папку">
+        <Tooltip title={t('patientsList.openFolder')}>
           <FolderOpenOutlined
             onClick={(e) => {
               e.stopPropagation();
@@ -457,15 +502,15 @@ const PatientsList: React.FC = () => {
       const result = await patientsApi.scanUsb();
       
       if (result && result.length > 0) {
-        message.success(`Успішно імпортовано матеріали`);
+        message.success(t('patientsList.messages.importSuccess'));
       } else {
-        message.info('Не знайдено нових даних для імпорту');
+        message.info(t('patientsList.messages.noDataToImport'));
       }
       
       await reloadPatients();
     } catch (error) {
       console.error('Import error:', error);
-      message.error('Помилка при імпорті даних');
+      message.error(t('patientsList.messages.importError'));
     } finally {
       setImportLoading(false);
       setImportProgress({ current: 0, total: 0, progress: 0, folderName: '' });
@@ -476,7 +521,7 @@ const PatientsList: React.FC = () => {
     {
       key: "usb",
       icon: <UsbOutlined />,
-      label: "Імпорт з папки",
+      label: t('patientsList.importFromFolder'),
       onClick: handleUsbImport,
     },
   ];
@@ -531,7 +576,7 @@ const PatientsList: React.FC = () => {
       >
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <LoadingOutlined style={{ fontSize: 48, color: token.colorPrimary, marginBottom: 20 }} />
-          <h3 style={{ marginBottom: 16 }}>Імпорт даних</h3>
+          <h3 style={{ marginBottom: 16 }}>{t('patientsList.import.title')}</h3>
           
           {importProgress.total > 0 ? (
             <>
@@ -544,7 +589,7 @@ const PatientsList: React.FC = () => {
                 }}
               />
               <p style={{ marginTop: 12, color: '#666', fontSize: '14px' }}>
-                Обробка папки {importProgress.current} з {importProgress.total}
+                {t('patientsList.import.processingFolder', { current: importProgress.current, total: importProgress.total })}
               </p>
               {importProgress.folderName && (
                 <p style={{ marginTop: 8, fontSize: '12px', color: '#999', wordBreak: 'break-all' }}>
@@ -556,13 +601,13 @@ const PatientsList: React.FC = () => {
             <>
               <Progress percent={100} status="active" showInfo={false} />
               <p style={{ marginTop: 16, color: '#666' }}>
-                Підготовка до імпорту...
+                {t('patientsList.import.preparing')}
               </p>
             </>
           )}
           
           <p style={{ marginTop: 12, fontSize: '12px', color: '#999' }}>
-            Це може зайняти деякий час для великих файлів
+            {t('patientsList.import.largeFilesNote')}
           </p>
         </div>
       </Modal>
@@ -575,10 +620,10 @@ const PatientsList: React.FC = () => {
             }}>
           <div className="title-row">
             <div className="title-left">
-              <h2>Пацієнти</h2>
+              <h2>{t('patientsList.title')}</h2>
               <Input
                 className="search-input"
-                placeholder="Пошук за іменем/прізвищем…"
+                placeholder={t('patientsList.searchPlaceholder')}
                 value={tableState.search}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 allowClear
@@ -591,7 +636,7 @@ const PatientsList: React.FC = () => {
                 icon={<PlusOutlined />}
                 onClick={() => setAddOpen(true)}
               >
-                Додати картку
+                {t('patientsList.addCard')}
               </Button>
 
               <Dropdown menu={{ items }} trigger={["click"]}>
@@ -610,7 +655,7 @@ const PatientsList: React.FC = () => {
             })}
             rowClassName="patient-row"
             locale={{
-              emptyText: "Поки немає доданих пацієнтів"
+              emptyText: t('patientsList.emptyText')
             }}
           />
 
@@ -623,11 +668,11 @@ const PatientsList: React.FC = () => {
                   disabled={!hasActiveFilters()}
                   size="small"
                 >
-                  Очистити фільтри
+                  {t('patientsList.filters.clearFilters')}
                 </Button>
                 {getActiveFilters().length > 0 && (
                   <span style={{ color: '#666', fontSize: '13px' }}>
-                    Активні фільтри: {getActiveFilters().map((filter, index) => (
+                    {t('patientsList.filters.activeFilters')} {getActiveFilters().map((filter, index) => (
                       <Tag key={index} color="blue" style={{ margin: '0 2px' }}>
                         {filter}
                       </Tag>
@@ -642,9 +687,9 @@ const PatientsList: React.FC = () => {
                   current={tableState.pagination.current}
                   pageSize={tableState.pagination.pageSize}
                   total={tableState.pagination.total}
-                  showSizeChanger
+                  showSizeChanger={showSizeChanger}
                   showTotal={(total, range) => 
-                    `${range[0]}-${range[1]} з ${total} записів`
+                    t('common.pagination.showTotal', { start: range[0], end: range[1], total })
                   }
                   onChange={(page, pageSize) => {
                     updateTableState({ 
