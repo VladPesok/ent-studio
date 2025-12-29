@@ -37,6 +37,9 @@ export interface AppConfig {
   deletePatientCard(cardFileName: string): Promise<{ success: boolean; error?: string }>;
   setDefaultPatientCard(fileName: string | null): Promise<void>;
   getEffectiveDefaultCard(): string | null;
+
+  showSizeChanger: boolean;
+  setShowSizeChanger(value: boolean): void;
 }
 
 export const AppConfigContext = createContext<AppConfig>(null!);
@@ -51,17 +54,19 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
   const [currentDoctor, setCurrentDoctor] = useState<string | null>(null);
   const [patientCards, setPatientCards]   = useState<PatientCard[]>([]);
   const [defaultPatientCard, setDefaultPatientCardState] = useState<string | null>(null);
+  const [showSizeChanger, setShowSizeChanger] = useState<boolean>(true);
 
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     (async () => {
-      const [settings, dictionaries, session, cards, defaultCard] = await Promise.all([
+      const [settings, dictionaries, session, cards, defaultCard, savedShowSizeChanger] = await Promise.all([
         configApi.getSettings(),
         configApi.getDictionaries(),
         configApi.getSession(),
         configApi.getPatientCards(),
         configApi.getDefaultPatientCard(),
+        window.ipcRenderer.invoke("db:settings:get", "showSizeChanger"),
       ]);
 
       setTheme(settings.theme);
@@ -71,6 +76,7 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
       setCurrentDoctor(session.currentDoctor);
       setPatientCards(cards);
       setDefaultPatientCardState(defaultCard);
+      setShowSizeChanger(savedShowSizeChanger !== null ? savedShowSizeChanger : true);
       setLoaded(true);
     })();
   }, []);
@@ -163,6 +169,13 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const handleSetShowSizeChanger = (value: boolean): void => {
+    setShowSizeChanger(value);
+    window.ipcRenderer.invoke("db:settings:set", "showSizeChanger", value).catch((error) => {
+      console.error('Failed to save showSizeChanger:', error);
+    });
+  };
+
   const getEffectiveDefaultCard = (): string | null => {
     if (patientCards.length === 0) return null;
     if (defaultPatientCard) return defaultPatientCard;
@@ -189,8 +202,10 @@ export const AppConfigProvider: React.FC<{ children: React.ReactNode }> = ({
       deletePatientCard,
       setDefaultPatientCard,
       getEffectiveDefaultCard,
+      showSizeChanger,
+      setShowSizeChanger: handleSetShowSizeChanger,
     }),
-    [theme, locale, currentDoctor, doctors, diagnoses, patientCards, defaultPatientCard],
+    [theme, locale, currentDoctor, doctors, diagnoses, patientCards, defaultPatientCard, showSizeChanger],
   );
 
   return (

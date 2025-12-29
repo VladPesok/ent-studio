@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Modal, Select, Button, Typography, Space, Spin, message } from 'antd';
 import { ExclamationCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { DefaultOptionType } from 'antd/es/select';
 import * as patientsApi from '../../../helpers/patientsApi';
 
@@ -19,6 +20,7 @@ const MergePatientModal: React.FC<MergePatientModalProps> = ({
   onCancel,
   onSuccess,
 }) => {
+  const { t } = useTranslation();
   const [patients, setPatients] = useState<patientsApi.PatientListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [merging, setMerging] = useState(false);
@@ -41,7 +43,7 @@ const MergePatientModal: React.FC<MergePatientModalProps> = ({
       setPatients(allPatients.filter(p => p.folder !== currentPatientFolder));
     } catch (error) {
       console.error('Failed to load patients:', error);
-      message.error('Помилка завантаження списку пацієнтів');
+      message.error(t('patientOverview.mergeModal.messages.loadError'));
     } finally {
       setLoading(false);
     }
@@ -74,22 +76,22 @@ const MergePatientModal: React.FC<MergePatientModalProps> = ({
       : selectedPatient;
 
     Modal.confirm({
-      title: 'Підтвердження об\'єднання',
+      title: t('patientOverview.mergeModal.confirmTitle'),
       icon: <WarningOutlined style={{ color: '#faad14' }} />,
       content: (
         <div>
           <Text>
-            Ви впевнені, що хочете об'єднати картку <Text strong>"{patientName}"</Text> з поточною карткою?
+            {t('patientOverview.mergeModal.confirmMessage', { patientName })}
           </Text>
           <br /><br />
           <Text type="danger">
-            <ExclamationCircleOutlined /> Ця дія незворотна! Обрана картка буде видалена, а всі її прийоми та файли будуть перенесені до поточної картки.
+            <ExclamationCircleOutlined /> {t('patientOverview.mergeModal.confirmWarning')}
           </Text>
         </div>
       ),
-      okText: 'Так, об\'єднати',
+      okText: t('patientOverview.mergeModal.yesMerge'),
       okType: 'danger',
-      cancelText: 'Скасувати',
+      cancelText: t('common.cancel'),
       onOk: handleMerge,
     });
   };
@@ -103,14 +105,14 @@ const MergePatientModal: React.FC<MergePatientModalProps> = ({
       const result = await patientsApi.mergePatients(selectedPatient, currentPatientFolder);
       
       if (result.success) {
-        message.success('Картки пацієнтів успішно об\'єднано');
+        message.success(t('patientOverview.mergeModal.messages.mergeSuccess'));
         onSuccess();
       } else {
-        message.error(result.error || 'Помилка об\'єднання карток');
+        message.error(result.error || t('patientOverview.mergeModal.messages.mergeError'));
       }
     } catch (error) {
       console.error('Failed to merge patients:', error);
-      message.error('Помилка об\'єднання карток');
+      message.error(t('patientOverview.mergeModal.messages.mergeError'));
     } finally {
       setMerging(false);
     }
@@ -128,14 +130,14 @@ const MergePatientModal: React.FC<MergePatientModalProps> = ({
       open={visible}
       title={
         <Title level={4} style={{ margin: 0 }}>
-          Об'єднати картки пацієнтів
+          {t('patientOverview.mergeModal.title')}
         </Title>
       }
       onCancel={onCancel}
       footer={
         <Space>
           <Button onClick={onCancel}>
-            Скасувати
+            {t('common.cancel')}
           </Button>
           <Button
             type="primary"
@@ -144,7 +146,7 @@ const MergePatientModal: React.FC<MergePatientModalProps> = ({
             loading={merging}
             onClick={handleConfirm}
           >
-            Підтвердити
+            {t('patientOverview.mergeModal.confirm')}
           </Button>
         </Space>
       }
@@ -152,9 +154,7 @@ const MergePatientModal: React.FC<MergePatientModalProps> = ({
     >
       <div style={{ marginBottom: 16 }}>
         <Text type="secondary">
-          Оберіть картку пацієнта, яку потрібно об'єднати з поточною. 
-          Всі прийоми та файли з обраної картки будуть перенесені до поточної картки, 
-          після чого обрана картка буде видалена.
+          {t('patientOverview.mergeModal.description')}
         </Text>
       </div>
 
@@ -165,7 +165,7 @@ const MergePatientModal: React.FC<MergePatientModalProps> = ({
       ) : (
         <Select
           showSearch
-          placeholder="Оберіть пацієнта для об'єднання..."
+          placeholder={t('patientOverview.mergeModal.selectPatientPlaceholder')}
           value={selectedPatient}
           onChange={setSelectedPatient}
           options={options}
@@ -174,7 +174,7 @@ const MergePatientModal: React.FC<MergePatientModalProps> = ({
           size="large"
           virtual
           listHeight={300}
-          notFoundContent="Пацієнтів не знайдено"
+          notFoundContent={t('patientOverview.mergeModal.noPatients')}
         />
       )}
     </Modal>

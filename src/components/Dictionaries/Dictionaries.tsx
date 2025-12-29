@@ -1,47 +1,28 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Tabs, Table, Button, Modal, Input, Space, Tag, message, Tooltip, Typography, Radio } from 'antd';
-import { EditOutlined, DeleteOutlined, UndoOutlined, PlusOutlined, CheckCircleOutlined } from '@ant-design/icons';
-import type { ColumnsType } from 'antd/es/table';
+import { Tabs, Button, Modal, Input, message, Typography } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { AppConfigContext } from '../../holders/AppConfig';
 import * as patientsApi from '../../helpers/patientsApi';
+import { DictionaryItem, PatientStatusItem, DictionaryType } from './types';
+import DoctorsTable from './pages/DoctorsTable';
+import DiagnosesTable from './pages/DiagnosesTable';
+import StatusesTable from './pages/StatusesTable';
 import './Dictionaries.css';
 
 const { Title } = Typography;
 
-interface DictionaryItem {
-  id: number;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
-interface PatientStatusItem {
-  id: number;
-  name: string;
-  isDefault: boolean;
-  createdAt: string;
-  updatedAt: string;
-  deletedAt: string | null;
-}
-
-type DictionaryType = 'doctors' | 'diagnoses' | 'statuses';
-
 const Dictionaries: React.FC = () => {
+  const { t } = useTranslation();
   const { refreshDictionaries } = useContext(AppConfigContext);
   const [activeTab, setActiveTab] = useState<DictionaryType>('doctors');
   const [doctors, setDoctors] = useState<DictionaryItem[]>([]);
   const [diagnoses, setDiagnoses] = useState<DictionaryItem[]>([]);
   const [statuses, setStatuses] = useState<PatientStatusItem[]>([]);
   const [loading, setLoading] = useState(false);
-  const [editModalVisible, setEditModalVisible] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
-  const [editingItem, setEditingItem] = useState<DictionaryItem | null>(null);
-  const [editingStatus, setEditingStatus] = useState<PatientStatusItem | null>(null);
-  const [editName, setEditName] = useState('');
   const [newName, setNewName] = useState('');
 
-  // Load data
   const loadData = async () => {
     setLoading(true);
     try {
@@ -55,7 +36,7 @@ const Dictionaries: React.FC = () => {
       setStatuses(statusesData);
     } catch (error) {
       console.error('Failed to load dictionaries:', error);
-      message.error('Помилка завантаження словників');
+      message.error(t('dictionaries.messages.loadError'));
     } finally {
       setLoading(false);
     }
@@ -65,146 +46,6 @@ const Dictionaries: React.FC = () => {
     loadData();
   }, []);
 
-  // Format date for display
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('uk-UA', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  // Handle edit for doctors/diagnoses
-  const handleEdit = (item: DictionaryItem) => {
-    setEditingItem(item);
-    setEditingStatus(null);
-    setEditName(item.name);
-    setEditModalVisible(true);
-  };
-
-  // Handle edit for statuses
-  const handleEditStatus = (item: PatientStatusItem) => {
-    setEditingStatus(item);
-    setEditingItem(null);
-    setEditName(item.name);
-    setEditModalVisible(true);
-  };
-
-  // Save edit
-  const handleSaveEdit = async () => {
-    if (!editName.trim()) return;
-
-    try {
-      if (editingStatus) {
-        // Editing a status
-        const success = await patientsApi.updatePatientStatusEntry(editingStatus.id, editName.trim());
-        if (!success) {
-          message.error('Не вдалося зберегти статус');
-          return;
-        }
-      } else if (editingItem) {
-        // Editing doctor/diagnosis
-        const handler = activeTab === 'doctors' ? 'db:dict:doctors:update' : 'db:dict:diagnoses:update';
-        await window.ipcRenderer.invoke(handler, editingItem.id, editName.trim());
-      }
-      message.success('Збережено');
-      setEditModalVisible(false);
-      setEditingItem(null);
-      setEditingStatus(null);
-      setEditName('');
-      loadData();
-      refreshDictionaries();
-    } catch (error) {
-      console.error('Failed to update:', error);
-      message.error('Помилка збереження');
-    }
-  };
-
-  // Handle soft delete for doctors/diagnoses
-  const handleDelete = async (item: DictionaryItem) => {
-    try {
-      const handler = activeTab === 'doctors' ? 'db:dict:doctors:delete' : 'db:dict:diagnoses:delete';
-      await window.ipcRenderer.invoke(handler, item.id);
-      message.success('Видалено');
-      loadData();
-      refreshDictionaries();
-    } catch (error) {
-      console.error('Failed to delete:', error);
-      message.error('Помилка видалення');
-    }
-  };
-
-  // Handle delete (archive) for statuses
-  const handleDeleteStatus = async (item: PatientStatusItem) => {
-    if (item.isDefault) {
-      message.error('Статус за замовчуванням не можна архівувати');
-      return;
-    }
-    try {
-      const success = await patientsApi.deletePatientStatusEntry(item.id);
-      if (!success) {
-        message.error('Не вдалося архівувати статус');
-        return;
-      }
-      message.success('Архівовано');
-      loadData();
-    } catch (error) {
-      console.error('Failed to archive status:', error);
-      message.error('Помилка архівування');
-    }
-  };
-
-  // Handle restore for statuses
-  const handleRestoreStatus = async (item: PatientStatusItem) => {
-    try {
-      const success = await patientsApi.restorePatientStatusEntry(item.id);
-      if (!success) {
-        message.error('Не вдалося відновити статус');
-        return;
-      }
-      message.success('Відновлено');
-      loadData();
-    } catch (error) {
-      console.error('Failed to restore status:', error);
-      message.error('Помилка відновлення');
-    }
-  };
-
-  // Handle setting default status
-  const handleSetDefaultStatus = async (id: number) => {
-    try {
-      const success = await patientsApi.setDefaultPatientStatus(id);
-      if (!success) {
-        message.error('Не вдалося встановити статус за замовчуванням');
-        return;
-      }
-      message.success('Статус за замовчуванням оновлено');
-      loadData();
-    } catch (error) {
-      console.error('Failed to set default status:', error);
-      message.error('Помилка оновлення');
-    }
-  };
-
-  // Handle restore
-  const handleRestore = async (item: DictionaryItem) => {
-    try {
-      const handler = activeTab === 'doctors' ? 'db:dict:doctors:restore' : 'db:dict:diagnoses:restore';
-      await window.ipcRenderer.invoke(handler, item.id);
-      message.success('Відновлено');
-      loadData();
-      refreshDictionaries();
-    } catch (error) {
-      console.error('Failed to restore:', error);
-      message.error('Помилка відновлення');
-    }
-  };
-
-  // Handle add new
   const handleAdd = async () => {
     if (!newName.trim()) return;
 
@@ -216,261 +57,65 @@ const Dictionaries: React.FC = () => {
         await window.ipcRenderer.invoke(handler, newName.trim());
         refreshDictionaries();
       }
-      message.success('Додано');
+      message.success(t('common.added'));
       setAddModalVisible(false);
       setNewName('');
       loadData();
     } catch (error) {
       console.error('Failed to add:', error);
-      message.error('Помилка додавання');
+      message.error(t('dictionaries.messages.saveError'));
     }
   };
 
-  // Table columns for doctors/diagnoses
-  const columns: ColumnsType<DictionaryItem> = [
-    {
-      title: 'Назва',
-      dataIndex: 'name',
-      key: 'name',
-      sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (text, record) => (
-        <span style={{ color: record.deletedAt ? '#999' : 'inherit' }}>
-          {text}
-        </span>
-      ),
-    },
-    {
-      title: 'Створено',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (text) => formatDate(text),
-      sorter: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    },
-    {
-      title: 'Оновлено',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      width: 180,
-      render: (text) => formatDate(text),
-      sorter: (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
-    },
-    {
-      title: 'Статус',
-      dataIndex: 'deletedAt',
-      key: 'status',
-      width: 120,
-      filters: [
-        { text: 'Активний', value: 'active' },
-        { text: 'Видалений', value: 'deleted' },
-      ],
-      onFilter: (value, record) => {
-        if (value === 'active') return !record.deletedAt;
-        return !!record.deletedAt;
-      },
-      render: (deletedAt) => (
-        deletedAt ? (
-          <Tag color="red">Видалений</Tag>
-        ) : (
-          <Tag color="green">Активний</Tag>
-        )
-      ),
-    },
-    {
-      title: 'Дії',
-      key: 'actions',
-      width: 100,
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Редагувати">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEdit(record)}
-            />
-          </Tooltip>
-          {record.deletedAt ? (
-            <Tooltip title="Відновити">
-              <Button
-                type="text"
-                size="small"
-                icon={<UndoOutlined />}
-                style={{ color: '#52c41a' }}
-                onClick={() => handleRestore(record)}
-              />
-            </Tooltip>
-          ) : (
-            <Tooltip title="Видалити">
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleDelete(record)}
-              />
-            </Tooltip>
-          )}
-        </Space>
-      ),
-    },
-  ];
+  const getAddButtonLabel = () => {
+    switch (activeTab) {
+      case 'doctors': return t('dictionaries.addButtons.doctor');
+      case 'diagnoses': return t('dictionaries.addButtons.diagnosis');
+      case 'statuses': return t('dictionaries.addButtons.status');
+      default: return t('common.add');
+    }
+  };
 
-  // Table columns for patient statuses
-  const statusColumns: ColumnsType<PatientStatusItem> = [
-    {
-      title: 'Назва',
-      dataIndex: 'name',
-      key: 'name',
-      sorter: (a, b) => a.name.localeCompare(b.name),
-      render: (text, record) => (
-        <span style={{ color: record.deletedAt ? '#999' : 'inherit' }}>
-          {text}
-        </span>
-      ),
-    },
-    {
-      title: 'За замовчуванням',
-      dataIndex: 'isDefault',
-      key: 'isDefault',
-      width: 160,
-      render: (isDefault, record) => (
-        <Radio
-          checked={isDefault}
-          onChange={() => handleSetDefaultStatus(record.id)}
-          disabled={!!record.deletedAt} // Cannot set archived status as default
-        >
-          {isDefault && <CheckCircleOutlined style={{ color: '#52c41a', marginLeft: 4 }} />}
-        </Radio>
-      ),
-    },
-    {
-      title: 'Статус',
-      dataIndex: 'deletedAt',
-      key: 'status',
-      width: 120,
-      filters: [
-        { text: 'Активний', value: 'active' },
-        { text: 'Архівований', value: 'deleted' },
-      ],
-      onFilter: (value, record) => {
-        if (value === 'active') return !record.deletedAt;
-        return !!record.deletedAt;
-      },
-      render: (deletedAt) => (
-        deletedAt ? (
-          <Tag color="red">Архівований</Tag>
-        ) : (
-          <Tag color="green">Активний</Tag>
-        )
-      ),
-    },
-    {
-      title: 'Створено',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 180,
-      render: (text) => formatDate(text),
-      sorter: (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-    },
-    {
-      title: 'Оновлено',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      width: 180,
-      render: (text) => formatDate(text),
-      sorter: (a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
-    },
-    {
-      title: 'Дії',
-      key: 'actions',
-      width: 100,
-      render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="Редагувати">
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleEditStatus(record)}
-            />
-          </Tooltip>
-          {record.deletedAt ? (
-            <Tooltip title="Відновити">
-              <Button
-                type="text"
-                size="small"
-                icon={<UndoOutlined />}
-                style={{ color: '#52c41a' }}
-                onClick={() => handleRestoreStatus(record)}
-              />
-            </Tooltip>
-          ) : (
-            <Tooltip title={record.isDefault ? "Статус за замовчуванням не можна архівувати" : "Архівувати"}>
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => handleDeleteStatus(record)}
-                disabled={record.isDefault}
-              />
-            </Tooltip>
-          )}
-        </Space>
-      ),
-    },
-  ];
+  const getModalTitle = () => {
+    switch (activeTab) {
+      case 'doctors': return t('dictionaries.modals.addDoctor');
+      case 'diagnoses': return t('dictionaries.modals.addDiagnosis');
+      case 'statuses': return t('dictionaries.modals.addStatus');
+      default: return t('common.add');
+    }
+  };
 
   const tabItems = [
     {
       key: 'doctors',
-      label: 'Лікарі',
+      label: t('dictionaries.tabs.doctors'),
       children: (
-        <Table
-          columns={columns}
-          dataSource={doctors}
-          rowKey="id"
-          loading={loading}
-          pagination={{ 
-            pageSize: 10, 
-            showSizeChanger: true, 
-            showTotal: (total, range) => `${range[0]}-${range[1]} з ${total} записів` 
-          }}
+        <DoctorsTable 
+          data={doctors} 
+          loading={loading} 
+          onDataChange={loadData} 
         />
       ),
     },
     {
       key: 'diagnoses',
-      label: 'Діагнози',
+      label: t('dictionaries.tabs.diagnoses'),
       children: (
-        <Table
-          columns={columns}
-          dataSource={diagnoses}
-          rowKey="id"
-          loading={loading}
-          pagination={{ 
-            pageSize: 10, 
-            showSizeChanger: true, 
-            showTotal: (total, range) => `${range[0]}-${range[1]} з ${total} записів` 
-          }}
+        <DiagnosesTable 
+          data={diagnoses} 
+          loading={loading} 
+          onDataChange={loadData} 
         />
       ),
     },
     {
       key: 'statuses',
-      label: 'Статуси пацієнтів',
+      label: t('dictionaries.tabs.statuses'),
       children: (
-        <Table
-          columns={statusColumns}
-          dataSource={statuses}
-          rowKey="id"
-          loading={loading}
-          pagination={{ 
-            pageSize: 10, 
-            showSizeChanger: true, 
-            showTotal: (total, range) => `${range[0]}-${range[1]} з ${total} записів` 
-          }}
+        <StatusesTable 
+          data={statuses} 
+          loading={loading} 
+          onDataChange={loadData} 
         />
       ),
     },
@@ -480,67 +125,43 @@ const Dictionaries: React.FC = () => {
     <div className="dictionaries-wrapper">
       <div className="dictionaries-container">
         <div className="dictionaries-header">
-        <Title level={3}>Словники</Title>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => setAddModalVisible(true)}
+          <Title level={3}>{t('dictionaries.title')}</Title>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => setAddModalVisible(true)}
+          >
+            {getAddButtonLabel()}
+          </Button>
+        </div>
+
+        <Tabs
+          activeKey={activeTab}
+          onChange={(key) => setActiveTab(key as DictionaryType)}
+          items={tabItems}
+        />
+
+        <Modal
+          title={getModalTitle()}
+          open={addModalVisible}
+          onOk={handleAdd}
+          onCancel={() => {
+            setAddModalVisible(false);
+            setNewName('');
+          }}
+          okText={t('common.add')}
+          cancelText={t('common.cancel')}
         >
-          Додати {activeTab === 'doctors' ? 'лікаря' : activeTab === 'diagnoses' ? 'діагноз' : 'статус'}
-        </Button>
-      </div>
-
-      <Tabs
-        activeKey={activeTab}
-        onChange={(key) => setActiveTab(key as DictionaryType)}
-        items={tabItems}
-      />
-
-      {/* Edit Modal */}
-      <Modal
-        title="Редагувати"
-        open={editModalVisible}
-        onOk={handleSaveEdit}
-        onCancel={() => {
-          setEditModalVisible(false);
-          setEditingItem(null);
-          setEditingStatus(null);
-          setEditName('');
-        }}
-        okText="Зберегти"
-        cancelText="Скасувати"
-      >
-        <Input
-          value={editName}
-          onChange={(e) => setEditName(e.target.value)}
-          placeholder="Введіть назву"
-          onPressEnter={handleSaveEdit}
-        />
-      </Modal>
-
-      {/* Add Modal */}
-      <Modal
-        title={`Додати ${activeTab === 'doctors' ? 'лікаря' : activeTab === 'diagnoses' ? 'діагноз' : 'статус'}`}
-        open={addModalVisible}
-        onOk={handleAdd}
-        onCancel={() => {
-          setAddModalVisible(false);
-          setNewName('');
-        }}
-        okText="Додати"
-        cancelText="Скасувати"
-      >
-        <Input
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          placeholder="Введіть назву"
-          onPressEnter={handleAdd}
-        />
-      </Modal>
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder={t('dictionaries.placeholders.enterName')}
+            onPressEnter={handleAdd}
+          />
+        </Modal>
       </div>
     </div>
   );
 };
 
 export default Dictionaries;
-

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Form } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { Test } from '../../TestConstructor';
 import HandicapIndex from './HandicapIndex/HandicapIndex';
 import { TEST_TYPES } from './constants/testTypes';
@@ -21,6 +22,7 @@ const TestTypesWrapper: React.FC<TestTypesWrapperProps> = ({
   initialValues,
   onDataChange
 }) => {
+  const { t } = useTranslation();
   let formValues = form.getFieldsValue();
   formValues = Object.keys(formValues).length === 0 ? initialValues : formValues;
   const testType = formValues.testType;
@@ -37,7 +39,7 @@ const TestTypesWrapper: React.FC<TestTypesWrapperProps> = ({
   return (
     <div style={{ textAlign: 'center', padding: '48px 24px' }}>
       <p style={{ color: '#8c8c8c', fontSize: '16px' }}>
-        Оберіть тип тесту для налаштування
+        {t('testConstructor.selectTestTypeHint')}
       </p>
     </div>
   );

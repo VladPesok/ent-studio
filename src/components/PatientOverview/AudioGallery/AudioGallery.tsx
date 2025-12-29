@@ -6,6 +6,7 @@ import {
   AudioOutlined,
   ExperimentOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import RecordAudioModal from './RecordAudioModal/RecordAudioModal';
 import * as configApi from "../../../helpers/configApi";
 import * as patientsApi from "../../../helpers/patientsApi";
@@ -31,6 +32,7 @@ interface AudioGalleryProps {
 }
 
 const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointment }) => {
+  const { t } = useTranslation();
   const [audioFiles, setAudioFiles] = useState<AudioFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentPlaying, setCurrentPlaying] = useState<string | null>(null);
@@ -142,30 +144,30 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
 
   const handleOpenWithPraat = async (audioFile: AudioFile) => {
     if (!praatPath) {
-      message.warning('Шлях до Praat не налаштовано. Перейдіть до налаштувань для конфігурації.');
+      message.warning(t('audioGallery.praatNotConfigured'));
       return;
     }
 
     try {
       const success = await configApi.openFileWithPraat(praatPath, audioFile.path);
       if (success) {
-        message.success(`Файл ${audioFile.fileName} відкрито в Praat`);
+        message.success(t('audioGallery.openedInPraat', { fileName: audioFile.fileName }));
       } else {
-        message.error('Помилка при відкритті файлу в Praat');
+        message.error(t('audioGallery.praatError'));
       }
     } catch (error) {
       console.error('Error opening file with Praat:', error);
-      message.error('Помилка при відкритті файлу в Praat');
+      message.error(t('audioGallery.praatError'));
     }
   };
 
   const handleOpenFile = async (file: AudioFile) => {
     try {
       await patientsApi.openFileInDefaultApp(file.path);
-      message.success(`Файл ${file.fileName} відкрито`);
+      message.success(t('audioGallery.fileOpened', { fileName: file.fileName }));
     } catch (error) {
       console.error('Error opening file:', error);
-      message.error('Помилка при відкритті файлу');
+      message.error(t('audioGallery.fileOpenError'));
     }
   };
 
@@ -174,7 +176,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
       <div className="audio-gallery-wrap">
         <div className="loading-state">
           <div className="loading-spinner"></div>
-          <p>Завантаження файлів...</p>
+          <p>{t('audioGallery.loadingFiles')}</p>
         </div>
       </div>
     );
@@ -185,27 +187,27 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
       <div className="audio-gallery-empty-wrap">
         <div className="empty-state">
           <div className="empty-icon">🎵</div>
-          <h3>Немає файлів</h3>
-          <p>Додайте файли до цього прийому</p>
+          <h3>{t('audioGallery.noFiles')}</h3>
+          <p>{t('audioGallery.addFilesHint')}</p>
           <Space>
             <Button 
               type="primary" 
               icon={<AudioOutlined />} 
               onClick={() => setRecordModalVisible(true)}
             >
-              Записати аудіо
+              {t('audioGallery.recordAudio')}
             </Button>
             <Button 
               icon={<PlusOutlined />} 
               onClick={handleLoadMoreFiles}
             >
-              Додати файли
+              {t('audioGallery.addFiles')}
             </Button>
             <Button 
               icon={<FolderOpenOutlined />} 
               onClick={handleOpenAudioFolder}
             >
-              Відкрити папку
+              {t('audioGallery.openFolder')}
             </Button>
           </Space>
         </div>
@@ -223,7 +225,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
     <div className="audio-gallery-wrap">
       <div className="audio-gallery-header">
         <div className="gallery-info">
-          <h3>Матеріали ({total})</h3>
+          <h3>{t('audioGallery.materials')} ({total})</h3>
         </div>
         <div className="gallery-actions">
           <Space>
@@ -232,19 +234,19 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
               icon={<AudioOutlined />} 
               onClick={() => setRecordModalVisible(true)}
             >
-              Записати аудіо
+              {t('audioGallery.recordAudio')}
             </Button>
             <Button 
               icon={<PlusOutlined />} 
               onClick={handleLoadMoreFiles}
             >
-              Додати файли
+              {t('audioGallery.addFiles')}
             </Button>
             <Button 
               icon={<FolderOpenOutlined />} 
               onClick={handleOpenAudioFolder}
             >
-              Відкрити папку
+              {t('audioGallery.openFolder')}
             </Button>
           </Space>
         </div>
@@ -275,7 +277,7 @@ const AudioGallery: React.FC<AudioGalleryProps> = ({ baseFolder, currentAppointm
                             size="small"
                             icon={<ExperimentOutlined />}
                             onClick={() => handleOpenWithPraat(file)}
-                            title="Відкрити в Praat"
+                            title={t('audioGallery.openInPraat')}
                             className="praat-button"
                           >
                             Praat

@@ -46,8 +46,12 @@ export function initializeDatabase(): BetterSQLite3Database<typeof schema> {
 
   // Create raw SQLite connection
   sqlite = new Database(dbPath);
+
+  sqlite.function('casefold', (v: unknown) => {
+    if (v === null || v === undefined) return '';
+    return String(v).normalize('NFKC').toLowerCase();
+  });
   
-  // Enable foreign keys
   sqlite.pragma('foreign_keys = ON');
   
   // Enable WAL mode for better concurrency

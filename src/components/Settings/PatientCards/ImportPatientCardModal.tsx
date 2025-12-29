@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Form, Input, Button, Upload, message } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { UploadFile, UploadProps } from 'antd';
 
 interface ImportPatientCardModalProps {
@@ -14,6 +15,7 @@ const ImportPatientCardModal: React.FC<ImportPatientCardModalProps> = ({
   onCancel,
   onSubmit,
 }) => {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -63,14 +65,14 @@ const ImportPatientCardModal: React.FC<ImportPatientCardModalProps> = ({
       await form.validateFields();
       
       if (!selectedFile) {
-        message.error('Будь ласка, оберіть файл');
+        message.error(t('settings.patientCards.importModal.selectFileError'));
         return;
       }
 
       const finalCardName = cardName.trim() || getFileNameWithoutExtension(selectedFile.name);
       
       if (!validateFileName(finalCardName)) {
-        message.error('Назва картки містить недопустимі символи');
+        message.error(t('settings.patientCards.importModal.invalidNameError'));
         return;
       }
 
@@ -104,7 +106,7 @@ const ImportPatientCardModal: React.FC<ImportPatientCardModalProps> = ({
       file.name.toLowerCase().endsWith('.rtf');
     
     if (!isValidType) {
-      message.error('Можна завантажувати тільки файли DOC, DOCX або RTF!');
+      message.error(t('settings.patientCards.importModal.fileTypeError'));
       return false;
     }
     
@@ -113,13 +115,13 @@ const ImportPatientCardModal: React.FC<ImportPatientCardModalProps> = ({
 
   return (
     <Modal
-      title="Імпорт картки пацієнта"
+      title={t('settings.patientCards.importModal.title')}
       open={visible}
       onCancel={handleCancel}
       width={520}
       footer={[
         <Button key="cancel" onClick={handleCancel}>
-          Скасувати
+          {t('common.cancel')}
         </Button>,
         <Button
           key="submit"
@@ -128,7 +130,7 @@ const ImportPatientCardModal: React.FC<ImportPatientCardModalProps> = ({
           disabled={!selectedFile}
           onClick={handleSubmit}
         >
-          Створити
+          {t('common.create')}
         </Button>,
       ]}
     >
@@ -138,21 +140,21 @@ const ImportPatientCardModal: React.FC<ImportPatientCardModalProps> = ({
         autoComplete="off"
       >
         <Form.Item
-          label="Назва картки"
+          label={t('settings.patientCards.importModal.cardName')}
           name="cardName"
-          help="Якщо не вказано, буде використано назву файлу"
+          help={t('settings.patientCards.importModal.cardNameHelp')}
         >
           <Input
-            placeholder="Введіть назву картки..."
+            placeholder={t('settings.patientCards.importModal.cardNamePlaceholder')}
             value={cardName}
             onChange={(e) => setCardName(e.target.value)}
           />
         </Form.Item>
 
         <Form.Item
-          label="Файл документа"
+          label={t('settings.patientCards.importModal.fileLabel')}
           name="file"
-          rules={[{ required: true, message: 'Будь ласка, оберіть файл!' }]}
+          rules={[{ required: true, message: t('settings.patientCards.importModal.fileRequired') }]}
         >
           <Upload
             maxCount={1}
@@ -166,7 +168,7 @@ const ImportPatientCardModal: React.FC<ImportPatientCardModalProps> = ({
             accept=".doc,.docx,.rtf"
           >
             <Button icon={<UploadOutlined />}>
-              Обрати файл (DOC, DOCX, RTF)
+              {t('settings.patientCards.importModal.selectFile')}
             </Button>
           </Upload>
         </Form.Item>

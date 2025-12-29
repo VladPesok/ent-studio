@@ -120,7 +120,6 @@ export function getAllPatients() {
  */
 export function getPatientsFiltered(filters?: PatientFilters): PaginatedResult<ReturnType<typeof getAllPatients>[number]> {
   const db = getDb();
-  
   // Build WHERE conditions
   const conditions: ReturnType<typeof eq>[] = [];
   
@@ -129,9 +128,9 @@ export function getPatientsFiltered(filters?: PatientFilters): PaginatedResult<R
     const searchTerm = `%${filters.search.trim().toLowerCase()}%`;
     conditions.push(
       or(
-        like(sql`LOWER(${patients.surname})`, searchTerm),
-        like(sql`LOWER(${patients.name})`, searchTerm),
-        like(sql`LOWER(${patients.surname} || ' ' || ${patients.name})`, searchTerm)
+        like(sql`casefold(${patients.surname})`, searchTerm),
+        like(sql`casefold(${patients.name})`, searchTerm),
+        like(sql`casefold(${patients.surname} || ' ' || casefold(${patients.name}))`, searchTerm)
       )!
     );
   }
@@ -141,9 +140,9 @@ export function getPatientsFiltered(filters?: PatientFilters): PaginatedResult<R
     const nameTerm = `%${filters.name.toLowerCase()}%`;
     conditions.push(
       or(
-        like(sql`LOWER(${patients.surname})`, nameTerm),
-        like(sql`LOWER(${patients.name})`, nameTerm),
-        like(sql`LOWER(${patients.surname} || ' ' || ${patients.name})`, nameTerm)
+        like(sql`casefold(${patients.surname})`, nameTerm),
+        like(sql`casefold(${patients.name})`, nameTerm),
+        like(sql`casefold(${patients.surname} || ' ' || casefold(${patients.name}))`, nameTerm)
       )!
     );
   }
@@ -164,7 +163,7 @@ export function getPatientsFiltered(filters?: PatientFilters): PaginatedResult<R
   // Diagnosis filter (text search)
   if (filters?.diagnosisText) {
     const diagnosisTerm = `%${filters.diagnosisText.toLowerCase()}%`;
-    conditions.push(like(sql`LOWER(${diagnoses.name})`, diagnosisTerm));
+    conditions.push(like(sql`casefold(${diagnoses.name})`, diagnosisTerm));
   }
   
   // Status filter
@@ -174,7 +173,6 @@ export function getPatientsFiltered(filters?: PatientFilters): PaginatedResult<R
   
   // Base query with filters
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
-  
   // Build ORDER BY
   let orderByClause;
   const sortOrder = filters?.sortOrder === 'ascend' ? asc : desc;
@@ -192,9 +190,11 @@ export function getPatientsFiltered(filters?: PatientFilters): PaginatedResult<R
     case 'diagnosis':
       orderByClause = [sortOrder(diagnoses.name)];
       break;
+    case 'statusName':
     case 'status':
       orderByClause = [sortOrder(patientStatuses.name)];
       break;
+    case 'latestAppointmentDate':
     case 'appointmentDate':
     default:
       // For appointment date, we need to sort by the subquery result

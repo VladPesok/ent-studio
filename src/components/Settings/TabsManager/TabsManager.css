@@ -1,12 +1,35 @@
-.tab-list-item {
-  padding: 8px 0 !important;
-}
-
 .tab-list-item.tab-hidden {
-  background-color: #fafafa;
+  opacity: 0.6;
 }
 
-.tab-list-item .ant-list-item-meta-title {
-  margin-bottom: 0 !important;
+.tab-drag-item {
+  touch-action: none;
 }
 
+.tab-item-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.drag-handle {
+  color: #999;
+  cursor: grab;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  touch-action: none;
+}
+
+.drag-handle:hover {
+  color: #666;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.tab-list-item .ant-list-item-meta {
+  flex: 1;
+}

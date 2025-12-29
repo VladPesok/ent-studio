@@ -2,12 +2,14 @@ import React from "react";
 import { Layout, Menu } from "antd";
 import { UserOutlined, SettingOutlined, ExperimentOutlined, BookOutlined } from "@ant-design/icons";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface Props {
   collapsed: boolean;
 }
 
 export const AppSider: React.FC<Props> = ({ collapsed }) => {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -22,22 +24,22 @@ export const AppSider: React.FC<Props> = ({ collapsed }) => {
     {
       key: "/",
       icon: <UserOutlined />,
-      label: "Пацієнти",
+      label: t('sider.patients'),
     },
     {
       key: "/tests",
       icon: <ExperimentOutlined />,
-      label: "Конструктор тестів",
+      label: t('sider.testConstructor'),
     },
     {
       key: "/dictionaries",
       icon: <BookOutlined />,
-      label: "Словники",
+      label: t('sider.dictionaries'),
     },
     {
       key: "/settings",
       icon: <SettingOutlined />,
-      label: "Налаштування",
+      label: t('sider.settings'),
     },
   ];
 

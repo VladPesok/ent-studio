@@ -8,6 +8,7 @@ import {
   SaveOutlined,
   DeleteOutlined
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import { getWaveBlob } from 'webm-to-wav-converter';
 import './RecordAudioModal.css';
 
@@ -30,6 +31,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
   onCancel,
   onSave
 }) => {
+  const { t } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -71,7 +73,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
       }
     } catch (error) {
       console.error('Error loading audio devices:', error);
-      message.error('Failed to load audio devices');
+      message.error(t('recordAudioModal.messages.loadDevicesError'));
     }
   };
 
@@ -137,7 +139,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
 
       timerRef.current = setInterval(() => setRecordingTime((p) => p + 1), 1000);
     } catch (e) {
-      message.error('Failed to start recording. Please check microphone permissions.');
+      message.error(t('recordAudioModal.messages.startError'));
     }
   };
 
@@ -186,7 +188,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
 
   const handleSave = async () => {
     if (!audioBlob || !filename.trim()) {
-      message.error('Please provide a filename for the recording');
+      message.error(t('recordAudioModal.messages.filenameRequired'));
       return;
     }
 
@@ -224,10 +226,9 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
       }
 
       await onSave(finalBlob, finalFilename);
-      const format = finalFilename.toLowerCase().endsWith('.wav') ? 'WAV' : 'original';
       handleCancel();
     } catch (error) {
-      message.error('Failed to save recording');
+      message.error(t('recordAudioModal.messages.saveError'));
     } finally {
       setSaving(false);
     }
@@ -288,7 +289,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
       title={
         <div className="record-modal-title">
           <AudioOutlined style={{ marginRight: 8, color: '#1890ff' }} />
-          Record Audio
+          {t('recordAudioModal.title')}
         </div>
       }
       open={visible}
@@ -296,7 +297,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
       width={600}
       footer={[
         <Button key="cancel" onClick={handleCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>,
         <Button
           key="save"
@@ -306,7 +307,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
           disabled={!audioBlob || !filename.trim()}
           loading={saving}
         >
-          Save Recording
+          {t('recordAudioModal.saveRecording')}
         </Button>
       ]}
       className="record-audio-modal"
@@ -314,12 +315,12 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
       <div className="record-modal-content">
         {/* Device Selection */}
         <div className="device-selection">
-          <Text strong>Microphone:</Text>
+          <Text strong>{t('recordAudioModal.microphone')}</Text>
           <Select
             value={selectedDevice}
             onChange={setSelectedDevice}
             style={{ width: '100%', marginTop: 8 }}
-            placeholder="Select microphone"
+            placeholder={t('recordAudioModal.selectMicrophone')}
           >
             {audioDevices.map(device => (
               <Option key={device.deviceId} value={device.deviceId}>
@@ -331,11 +332,11 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
 
         {/* Filename Input */}
         <div className="filename-input">
-          <Text strong>Filename:</Text>
+          <Text strong>{t('recordAudioModal.filename')}</Text>
           <Input
             value={filename}
             onChange={(e) => setFilename(e.target.value)}
-            placeholder="Enter filename"
+            placeholder={t('recordAudioModal.enterFilename')}
             style={{ marginTop: 8 }}
             suffix={fileExtension}
           />
@@ -348,7 +349,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
               <div className="recording-indicator">
                 <div className="recording-dot" />
                 <Text strong style={{ color: '#ff4d4f' }}>
-                  {isPaused ? 'PAUSED' : 'RECORDING'}
+                  {isPaused ? t('recordAudioModal.paused') : t('recordAudioModal.recording')}
                 </Text>
               </div>
             )}
@@ -369,7 +370,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
                   onClick={startRecording}
                   disabled={!selectedDevice}
                 >
-                  Start Recording
+                  {t('recordAudioModal.startRecording')}
                 </Button>
               ) : (
                 <>
@@ -378,7 +379,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
                     icon={isPaused ? <PlayCircleOutlined /> : <PauseCircleOutlined />}
                     onClick={togglePauseRecording}
                   >
-                    {isPaused ? 'Resume' : 'Pause'}
+                    {isPaused ? t('recordAudioModal.resume') : t('recordAudioModal.pause')}
                   </Button>
                   <Button
                     size="large"
@@ -386,7 +387,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
                     onClick={stopRecording}
                     danger
                   >
-                    Stop
+                    {t('recordAudioModal.stop')}
                   </Button>
                 </>
               )}
@@ -398,7 +399,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
         {audioBlob && (
           <div className="playback-section">
             <div className="playback-header">
-              <Text strong>Recording Preview:</Text>
+              <Text strong>{t('recordAudioModal.recordingPreview')}</Text>
               <Button
                 type="text"
                 icon={<DeleteOutlined />}
@@ -406,7 +407,7 @@ const RecordAudioModal: React.FC<RecordAudioModalProps> = ({
                 danger
                 size="small"
               >
-                Delete
+                {t('common.delete')}
               </Button>
             </div>
             

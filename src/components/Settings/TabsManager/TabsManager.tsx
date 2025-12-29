@@ -3,12 +3,27 @@ import { Card, List, Switch, Button, Input, Modal, message, Space, Typography, T
 import { 
   PlusOutlined, 
   EditOutlined, 
-  DeleteOutlined, 
-  ArrowUpOutlined, 
-  ArrowDownOutlined,
+  HolderOutlined,
   LockOutlined
 } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import * as configApi from '../../../helpers/configApi';
 import './TabsManager.css';
 
@@ -23,6 +38,89 @@ interface TabItem {
   isDefault: boolean;
 }
 
+interface SortableTabItemProps {
+  tab: TabItem;
+  onVisibilityChange: (tab: TabItem, checked: boolean) => void;
+  onEdit: (tab: TabItem) => void;
+  getDisplayName: (tab: TabItem) => string;
+  renameTooltip: string;
+  defaultTabTooltip: string;
+}
+
+const SortableTabItem: React.FC<SortableTabItemProps> = ({ 
+  tab, 
+  onVisibilityChange, 
+  onEdit, 
+  getDisplayName,
+  renameTooltip,
+  defaultTabTooltip
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: tab.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    background: isDragging ? '#fafafa' : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} className="tab-drag-item">
+      <List.Item
+        className={`tab-list-item ${!tab.isVisible ? 'tab-hidden' : ''}`}
+        actions={[
+          <Space key="actions" size="small">
+            <Tooltip title={renameTooltip}>
+              <Button
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => onEdit(tab)}
+              />
+            </Tooltip>
+          </Space>
+        ]}
+      >
+        <div className="tab-item-content">
+          <div 
+            className="drag-handle" 
+            {...attributes} 
+            {...listeners}
+          >
+            <HolderOutlined />
+          </div>
+          <List.Item.Meta
+            title={
+              <Space>
+                <Switch
+                  size="small"
+                  checked={tab.isVisible}
+                  onChange={(checked) => onVisibilityChange(tab, checked)}
+                />
+                <Text style={{ color: tab.isVisible ? undefined : '#999' }}>
+                  {getDisplayName(tab)}
+                </Text>
+                {tab.isDefault && (
+                  <Tooltip title={defaultTabTooltip}>
+                    <LockOutlined style={{ color: '#999', fontSize: 12 }} />
+                  </Tooltip>
+                )}
+              </Space>
+            }
+          />
+        </div>
+      </List.Item>
+    </div>
+  );
+};
+
 const TabsManager: React.FC = () => {
   const { t } = useTranslation();
   const [tabs, setTabs] = useState<TabItem[]>([]);
@@ -33,6 +131,17 @@ const TabsManager: React.FC = () => {
   const [newTabName, setNewTabName] = useState('');
   const [editTabName, setEditTabName] = useState('');
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
   const loadTabs = async () => {
     setLoading(true);
     try {
@@ -40,7 +149,7 @@ const TabsManager: React.FC = () => {
       setTabs(data.sort((a: TabItem, b: TabItem) => a.displayOrder - b.displayOrder));
     } catch (error) {
       console.error('Failed to load tabs:', error);
-      message.error('Помилка завантаження вкладок');
+      message.error(t('settings.tabs.messages.loadError'));
     } finally {
       setLoading(false);
     }
@@ -56,37 +165,28 @@ const TabsManager: React.FC = () => {
       setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, isVisible: checked } : t));
     } catch (error) {
       console.error('Failed to update visibility:', error);
-      message.error('Помилка зміни видимості');
+      message.error(t('settings.tabs.messages.visibilityError'));
     }
   };
 
-  const handleMoveUp = async (index: number) => {
-    if (index === 0) return;
-    
-    const newTabs = [...tabs];
-    [newTabs[index - 1], newTabs[index]] = [newTabs[index], newTabs[index - 1]];
-    
-    try {
-      await window.ipcRenderer.invoke('db:tabs:reorder', newTabs.map(t => t.id));
-      setTabs(newTabs.map((t, i) => ({ ...t, displayOrder: i })));
-    } catch (error) {
-      console.error('Failed to reorder:', error);
-      message.error('Помилка зміни порядку');
-    }
-  };
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
 
-  const handleMoveDown = async (index: number) => {
-    if (index === tabs.length - 1) return;
-    
-    const newTabs = [...tabs];
-    [newTabs[index], newTabs[index + 1]] = [newTabs[index + 1], newTabs[index]];
-    
-    try {
-      await window.ipcRenderer.invoke('db:tabs:reorder', newTabs.map(t => t.id));
+    if (over && active.id !== over.id) {
+      const oldIndex = tabs.findIndex((t) => t.id === active.id);
+      const newIndex = tabs.findIndex((t) => t.id === over.id);
+      
+      const newTabs = arrayMove(tabs, oldIndex, newIndex);
       setTabs(newTabs.map((t, i) => ({ ...t, displayOrder: i })));
-    } catch (error) {
-      console.error('Failed to reorder:', error);
-      message.error('Помилка зміни порядку');
+      
+      try {
+        await window.ipcRenderer.invoke('db:tabs:reorder', newTabs.map(t => t.id));
+      } catch (error) {
+        console.error('Failed to reorder:', error);
+        message.error(t('settings.tabs.messages.reorderError'));
+        // Revert on error
+        loadTabs();
+      }
     }
   };
 
@@ -105,10 +205,10 @@ const TabsManager: React.FC = () => {
       setEditModalVisible(false);
       setEditingTab(null);
       setEditTabName('');
-      message.success('Вкладку перейменовано');
+      message.success(t('settings.tabs.messages.tabRenamed'));
     } catch (error) {
       console.error('Failed to rename:', error);
-      message.error('Помилка перейменування');
+      message.error(t('settings.tabs.messages.renameError'));
     }
   };
 
@@ -119,7 +219,7 @@ const TabsManager: React.FC = () => {
     
     // Check for duplicate folder
     if (tabs.some(t => t.folder === folder)) {
-      message.error('Вкладка з такою назвою вже існує');
+      message.error(t('settings.tabs.messages.tabExists'));
       return;
     }
     
@@ -128,35 +228,11 @@ const TabsManager: React.FC = () => {
       setTabs(prev => [...prev, newTab]);
       setAddModalVisible(false);
       setNewTabName('');
-      message.success('Вкладку додано');
+      message.success(t('settings.tabs.messages.tabAdded'));
     } catch (error) {
       console.error('Failed to add tab:', error);
-      message.error('Помилка додавання вкладки');
+      message.error(t('settings.tabs.messages.addError'));
     }
-  };
-
-  const handleDelete = async (tab: TabItem) => {
-    Modal.confirm({
-      title: 'Видалити вкладку?',
-      content: `Ви впевнені, що хочете видалити вкладку "${tab.name}"? Файли в папці пацієнтів не будуть видалені.`,
-      okText: 'Видалити',
-      cancelText: 'Скасувати',
-      okButtonProps: { danger: true },
-      onOk: async () => {
-        try {
-          const result = await window.ipcRenderer.invoke('db:tabs:delete', tab.id);
-          if (result.success) {
-            setTabs(prev => prev.filter(t => t.id !== tab.id));
-            message.success('Вкладку видалено');
-          } else {
-            message.error(result.error || 'Помилка видалення');
-          }
-        } catch (error) {
-          console.error('Failed to delete:', error);
-          message.error('Помилка видалення');
-        }
-      },
-    });
   };
 
   const getDisplayName = (tab: TabItem) => {
@@ -168,7 +244,7 @@ const TabsManager: React.FC = () => {
 
   return (
     <Card 
-      title="Відображувані вкладки" 
+      title={t('settings.tabs.title')} 
       style={{ marginBottom: 24 }}
       extra={
         <Button
@@ -177,109 +253,65 @@ const TabsManager: React.FC = () => {
           onClick={() => setAddModalVisible(true)}
           size="small"
         >
-          Додати вкладку
+          {t('settings.tabs.addTab')}
         </Button>
       }
     >
-      <List
-        loading={loading}
-        dataSource={tabs}
-        locale={{ emptyText: 'Немає вкладок' }}
-        renderItem={(tab, index) => (
-          <List.Item
-            className={`tab-list-item ${!tab.isVisible ? 'tab-hidden' : ''}`}
-            actions={[
-              <Space key="actions" size="small">
-                <Tooltip title="Вгору">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<ArrowUpOutlined />}
-                    onClick={() => handleMoveUp(index)}
-                    disabled={index === 0}
-                  />
-                </Tooltip>
-                <Tooltip title="Вниз">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<ArrowDownOutlined />}
-                    onClick={() => handleMoveDown(index)}
-                    disabled={index === tabs.length - 1}
-                  />
-                </Tooltip>
-                <Tooltip title="Перейменувати">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<EditOutlined />}
-                    onClick={() => handleEdit(tab)}
-                  />
-                </Tooltip>
-                {!tab.isDefault && (
-                  <Tooltip title="Видалити">
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() => handleDelete(tab)}
-                    />
-                  </Tooltip>
-                )}
-              </Space>
-            ]}
-          >
-            <List.Item.Meta
-              title={
-                <Space>
-                  <Switch
-                    size="small"
-                    checked={tab.isVisible}
-                    onChange={(checked) => handleVisibilityChange(tab, checked)}
-                  />
-                  <Text style={{ color: tab.isVisible ? undefined : '#999' }}>
-                    {getDisplayName(tab)}
-                  </Text>
-                  {tab.isDefault && (
-                    <Tooltip title="Стандартна вкладка">
-                      <LockOutlined style={{ color: '#999', fontSize: 12 }} />
-                    </Tooltip>
-                  )}
-                </Space>
-              }
-            />
-          </List.Item>
-        )}
-      />
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={tabs.map(t => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <List
+            loading={loading}
+            dataSource={tabs}
+            locale={{ emptyText: t('settings.tabs.emptyTabs') }}
+            renderItem={(tab) => (
+              <SortableTabItem
+                key={tab.id}
+                tab={tab}
+                onVisibilityChange={handleVisibilityChange}
+                onEdit={handleEdit}
+                getDisplayName={getDisplayName}
+                renameTooltip={t('common.rename')}
+                defaultTabTooltip={t('settings.tabs.defaultTab')}
+              />
+            )}
+          />
+        </SortableContext>
+      </DndContext>
 
       <Text type="secondary" style={{ display: 'block', marginTop: 16 }}>
-        Використовуйте стрілки для зміни порядку вкладок. Приховані вкладки не відображаються у картці пацієнта.
+        {t('settings.tabs.dragHint')}
       </Text>
 
       {/* Add Modal */}
       <Modal
-        title="Додати вкладку"
+        title={t('settings.tabs.addTabModal')}
         open={addModalVisible}
         onOk={handleAdd}
         onCancel={() => {
           setAddModalVisible(false);
           setNewTabName('');
         }}
-        okText="Додати"
-        cancelText="Скасувати"
+        okText={t('common.add')}
+        cancelText={t('common.cancel')}
       >
         <Input
           value={newTabName}
           onChange={(e) => setNewTabName(e.target.value)}
-          placeholder="Назва вкладки"
+          placeholder={t('settings.tabs.tabName')}
           onPressEnter={handleAdd}
         />
       </Modal>
 
       {/* Edit Modal */}
       <Modal
-        title="Перейменувати вкладку"
+        title={t('settings.tabs.renameTab')}
         open={editModalVisible}
         onOk={handleSaveEdit}
         onCancel={() => {
@@ -287,13 +319,13 @@ const TabsManager: React.FC = () => {
           setEditingTab(null);
           setEditTabName('');
         }}
-        okText="Зберегти"
-        cancelText="Скасувати"
+        okText={t('common.save')}
+        cancelText={t('common.cancel')}
       >
         <Input
           value={editTabName}
           onChange={(e) => setEditTabName(e.target.value)}
-          placeholder="Назва вкладки"
+          placeholder={t('settings.tabs.tabName')}
           onPressEnter={handleSaveEdit}
         />
       </Modal>
@@ -302,4 +334,3 @@ const TabsManager: React.FC = () => {
 };
 
 export default TabsManager;
-

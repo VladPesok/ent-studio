@@ -53,15 +53,15 @@ const Settings: React.FC = () => {
         setDownloadingUpdate(false);
         setUpdateDownloaded(true);
         setDownloadProgress(100);
-        message.success('Оновлення завантажено! Натисніть "Встановити та перезапустити" для завершення.');
+        message.success(t('settings.updates.messages.downloaded'));
       },
       onUpdateError: (error) => {
         setDownloadingUpdate(false);
         setDownloadProgress(0);
-        message.error(`Помилка оновлення: ${error.message}`);
+        message.error(t('settings.updates.messages.updateError', { message: error.message }));
       }
     });
-  }, []);
+  }, [t]);
 
   const handleSelectPraatPath = async () => {
     setPraatLoading(true);
@@ -70,11 +70,11 @@ const Settings: React.FC = () => {
       if (selectedPath) {
         setPraatPath(selectedPath);
         await configApi.setSettings({ praatPath: selectedPath });
-        message.success('Шлях до Praat успішно збережено');
+        message.success(t('settings.praat.messages.pathSaved'));
       }
     } catch (error) {
       console.error('Failed to select Praat path:', error);
-      message.error('Помилка при виборі шляху до Praat');
+      message.error(t('settings.praat.messages.pathSelectError'));
     } finally {
       setPraatLoading(false);
     }
@@ -84,10 +84,10 @@ const Settings: React.FC = () => {
     try {
       setPraatPath("");
       await configApi.setSettings({ praatPath: "" });
-      message.success('Шлях до Praat очищено');
+      message.success(t('settings.praat.messages.pathCleared'));
     } catch (error) {
       console.error('Failed to clear Praat path:', error);
-      message.error('Помилка при очищенні шляху до Praat');
+      message.error(t('settings.praat.messages.pathClearError'));
     }
   };
 
@@ -98,15 +98,15 @@ const Settings: React.FC = () => {
       if (result && result.updateAvailable) {
         setUpdateAvailable(true);
         setUpdateInfo(result.updateInfo);
-        message.success('Доступне оновлення!');
+        message.success(t('settings.updates.messages.updateAvailable'));
       } else {
         setUpdateAvailable(false);
         setUpdateInfo(null);
-        message.info('Ви використовуєте останню версію');
+        message.info(t('settings.updates.messages.upToDate'));
       }
     } catch (error) {
       console.error('Failed to check for updates:', error);
-      message.error('Помилка при перевірці оновлень');
+      message.error(t('settings.updates.messages.checkError'));
     } finally {
       setCheckingUpdate(false);
     }
@@ -120,7 +120,7 @@ const Settings: React.FC = () => {
       await versionsApi.downloadUpdate();
     } catch (error) {
       console.error('Failed to download update:', error);
-      message.error('Помилка при завантаженні оновлення');
+      message.error(t('settings.updates.messages.downloadError'));
       setDownloadingUpdate(false);
       setDownloadProgress(0);
     }
@@ -131,7 +131,7 @@ const Settings: React.FC = () => {
       await versionsApi.installUpdate();
     } catch (error) {
       console.error('Failed to install update:', error);
-      message.error('Помилка при встановленні оновлення');
+      message.error(t('settings.updates.messages.installError'));
     }
   };
 
@@ -141,21 +141,21 @@ const Settings: React.FC = () => {
                 padding: '6px 24px 12px',
                 background: token.colorBgContainer,
               }}>
-      <Title level={2}>Налаштування</Title>
+      <Title level={2}>{t('settings.title')}</Title>
       <Divider />
       
       <TabsManager />
 
-      <Card title="Інтеграція з Praat" style={{ marginBottom: 24 }}>
+      <Card title={t('settings.praat.title')} style={{ marginBottom: 24 }}>
         <Form layout="vertical">
           <Form.Item 
-            label="Шлях до виконуваного файлу Praat"
-            help="Оберіть praat.exe для відкриття аудіо файлів у Praat. Якщо не налаштовано, кнопка 'Відкрити в Praat' не буде відображатися."
+            label={t('settings.praat.pathLabel')}
+            help={t('settings.praat.pathHelp')}
           >
             <Space.Compact style={{ width: '100%' }}>
               <Input
                 value={praatPath}
-                placeholder="Шлях до praat.exe не обрано..."
+                placeholder={t('settings.praat.pathPlaceholder')}
                 readOnly
                 style={{ flex: 1 }}
               />
@@ -164,7 +164,7 @@ const Settings: React.FC = () => {
                 onClick={handleSelectPraatPath}
                 loading={praatLoading}
               >
-                Обрати
+                {t('common.select')}
               </Button>
               {praatPath && (
                 <Button 
@@ -172,7 +172,7 @@ const Settings: React.FC = () => {
                   onClick={handleClearPraatPath}
                   danger
                 >
-                  Очистити
+                  {t('common.clear')}
                 </Button>
               )}
             </Space.Compact>
@@ -181,7 +181,7 @@ const Settings: React.FC = () => {
         
         {praatPath && (
           <Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0 }}>
-            <strong>Поточний шлях:</strong> {praatPath}
+            <strong>{t('common.currentPath')}</strong> {praatPath}
           </Paragraph>
         )}
       </Card>
@@ -190,12 +190,12 @@ const Settings: React.FC = () => {
 
       <StorageLocations />
 
-      <Card title="Оновлення додатку" style={{ marginBottom: 24 }}>
+      <Card title={t('settings.updates.title')} style={{ marginBottom: 24 }}>
         <Space direction="vertical" style={{ width: '100%', rowGap: 0 }}>
           <Paragraph>
-            <strong>📌 Поточна версія:</strong> {currentVersion || "Завантаження..."}
+            <strong>📌 {t('settings.updates.currentVersion')}</strong> {currentVersion || t('common.loading')}
             {updateInfo && updateAvailable && !updateDownloaded && (
-              <span> / <strong>🆕 Доступна версія:</strong> {updateInfo.version}</span>
+              <span> / <strong>🆕 {t('settings.updates.availableVersion')}</strong> {updateInfo.version}</span>
             )}
           </Paragraph>
           
@@ -206,7 +206,7 @@ const Settings: React.FC = () => {
               loading={checkingUpdate}
               disabled={downloadingUpdate || updateDownloaded}
             >
-              Перевірити оновлення
+              {t('settings.updates.checkUpdates')}
             </Button>
             
             {updateInfo && updateAvailable && !updateDownloaded && (
@@ -217,7 +217,7 @@ const Settings: React.FC = () => {
                 loading={downloadingUpdate}
                 disabled={downloadingUpdate}
               >
-                Завантажити оновлення
+                {t('settings.updates.downloadUpdate')}
               </Button>
             )}
             
@@ -228,7 +228,7 @@ const Settings: React.FC = () => {
                 onClick={handleInstallUpdate}
                 style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
               >
-                Встановити та перезапустити
+                {t('settings.updates.installRestart')}
               </Button>
             )}
           </Space>

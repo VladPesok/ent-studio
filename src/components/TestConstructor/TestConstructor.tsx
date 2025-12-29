@@ -45,7 +45,7 @@ const TestConstructor: React.FC = () => {
       setArchivedTests(archived);
     } catch (error) {
       console.error('Failed to load tests:', error);
-      message.error('Помилка завантаження тестів');
+      message.error(t('testConstructor.messages.loadError'));
     } finally {
       setLoading(false);
     }
@@ -68,22 +68,22 @@ const TestConstructor: React.FC = () => {
   const handleArchiveTest = async (testId: string) => {
     try {
       await testApi.archiveTest(testId);
-      message.success('Тест переміщено в архів');
+      message.success(t('testConstructor.messages.archivedSuccess'));
       loadTests();
     } catch (error) {
       console.error('Failed to archive test:', error);
-      message.error('Помилка архівування тесту');
+      message.error(t('testConstructor.messages.archiveError'));
     }
   };
 
   const handleRestoreTest = async (testId: string) => {
     try {
       await testApi.restoreTest(testId);
-      message.success('Тест відновлено з архіву');
+      message.success(t('testConstructor.messages.restoredSuccess'));
       loadTests();
     } catch (error) {
       console.error('Failed to restore test:', error);
-      message.error('Помилка відновлення тесту');
+      message.error(t('testConstructor.messages.restoreError'));
     }
   };
 
@@ -103,11 +103,11 @@ const TestConstructor: React.FC = () => {
     try {
       const result = await testApi.openTestsFolder();
       if (!result.success) {
-        message.error(`Помилка відкриття папки: ${result.error}`);
+        message.error(t('testConstructor.messages.folderOpenError', { error: result.error }));
       }
     } catch (error) {
       console.error('Failed to open tests folder:', error);
-      message.error('Помилка відкриття папки тестів');
+      message.error(t('testConstructor.messages.folderOpenFailed'));
     }
   };
 
@@ -115,14 +115,14 @@ const TestConstructor: React.FC = () => {
     try {
       const result = await testApi.importTest();
       if (result.success) {
-        message.success(`Тест "${result.test?.name}" імпортовано успішно`);
+        message.success(t('testConstructor.messages.importSuccess', { name: result.test?.name }));
         loadTests(); // Refresh the list
       } else if (result.error !== 'Import cancelled') {
-        message.error(`Помилка імпорту: ${result.error}`);
+        message.error(t('testConstructor.messages.importError', { error: result.error }));
       }
     } catch (error) {
       console.error('Failed to import test:', error);
-      message.error('Помилка імпорту тесту');
+      message.error(t('testConstructor.messages.importFailed'));
     }
   };
 
@@ -130,13 +130,13 @@ const TestConstructor: React.FC = () => {
     try {
       const result = await testApi.exportTest(testId);
       if (result.success) {
-        message.success(`Тест "${testName}" експортовано успішно`);
+        message.success(t('testConstructor.messages.exportSuccess', { name: testName }));
       } else if (result.error !== 'Export cancelled') {
-        message.error(`Помилка експорту: ${result.error}`);
+        message.error(t('testConstructor.messages.exportError', { error: result.error }));
       }
     } catch (error) {
       console.error('Failed to export test:', error);
-      message.error('Помилка експорту тесту');
+      message.error(t('testConstructor.messages.exportFailed'));
     }
   };
 
@@ -156,11 +156,11 @@ const TestConstructor: React.FC = () => {
     <div className="test-constructor-container">
       <div className="test-constructor-header">
       <h1>
-        Конструктор тестів
+        {t('testConstructor.title')}
       </h1>
         <div className="header-actions">
           <Space style={{ marginRight: '24px' }}>
-            <span>Показати архів</span>
+            <span>{t('testConstructor.showArchive')}</span>
             <Switch 
               checked={showArchived} 
               onChange={setShowArchived}
@@ -175,14 +175,14 @@ const TestConstructor: React.FC = () => {
             onClick={handleImportTest}
             style={{ marginRight: '12px' }}
           >
-            Імпортувати тест
+            {t('testConstructor.importTest')}
           </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleAddTest}
           >
-            Створити тест
+            {t('testConstructor.createTest')}
           </Button>
         </div>
       </div>
@@ -191,21 +191,21 @@ const TestConstructor: React.FC = () => {
         {loading ? (
           <div className="loading-container">
             <div className="loading-spinner" />
-            <p>Завантаження тестів...</p>
+            <p>{t('testConstructor.loadingTests')}</p>
           </div>
         ) : displayedTests.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description={
               <div>
-                <h3>{showArchived ? 'Архів порожній' : 'Немає створених тестів'}</h3>
-                <p>{showArchived ? 'Немає архівованих тестів' : 'Створіть свій перший медичний тест'}</p>
+                <h3>{showArchived ? t('testConstructor.archiveEmptyTitle') : t('testConstructor.emptyTitle')}</h3>
+                <p>{showArchived ? t('testConstructor.archiveEmptyDescription') : t('testConstructor.emptyDescription')}</p>
               </div>
             }
           >
             {!showArchived && (
               <Button type="primary" icon={<PlusOutlined />} onClick={handleAddTest}>
-                Створити тест
+                {t('testConstructor.createTest')}
               </Button>
             )}
           </Empty>
@@ -233,9 +233,9 @@ const TestConstructor: React.FC = () => {
                       </Tooltip>
                       <div className="test-created-date">
                         {test.updatedAt !== test.createdAt ? (
-                          <>Оновлено: {new Date(test.updatedAt).toLocaleDateString('uk-UA')}</>
+                          <>{t('testConstructor.updated')} {new Date(test.updatedAt).toLocaleDateString('uk-UA')}</>
                         ) : (
-                          <>Створено: {new Date(test.createdAt).toLocaleDateString('uk-UA')}</>
+                          <>{t('testConstructor.created')} {new Date(test.createdAt).toLocaleDateString('uk-UA')}</>
                         )}
                       </div>
                     </div>
@@ -247,7 +247,7 @@ const TestConstructor: React.FC = () => {
                           type="text"
                           icon={<UndoOutlined />}
                           onClick={() => handleRestoreTest(test.id)}
-                          title="Відновити"
+                          title={t('testConstructor.tooltips.restore')}
                           style={{ color: '#52c41a' }}
                         />
                       ) : (
@@ -256,14 +256,14 @@ const TestConstructor: React.FC = () => {
                             type="text"
                             icon={<EditOutlined />}
                             onClick={() => handleEditTest(test)}
-                            title="Редагувати"
+                            title={t('testConstructor.tooltips.edit')}
                           />
                           <Button
                             type="text"
                             danger
                             icon={<DeleteOutlined />}
                             onClick={() => handleArchiveTest(test.id)}
-                            title="В архів"
+                            title={t('testConstructor.tooltips.archive')}
                           />
                         </>
                       )}
@@ -273,18 +273,18 @@ const TestConstructor: React.FC = () => {
                   <div className="test-card-content">
                     <p className="test-description">{test.description}</p>
                     <div className="test-meta">
-                      <span className="test-type">Тип: {getTestTypeLabel(test.testType)}</span>
+                      <span className="test-type">{t('testConstructor.type')} {getTestTypeLabel(test.testType)}</span>
                       <span className="test-questions">
-                        Питань: {(test.testData as any)?.questions?.length || 0}
+                        {t('testConstructor.questions')} {(test.testData as any)?.questions?.length || 0}
                       </span>
                       <span className="test-ranges">
-                        Діагнозів: {(test.testData as any)?.diagnosisRanges?.length || 0}
+                        {t('testConstructor.diagnoses')} {(test.testData as any)?.diagnosisRanges?.length || 0}
                       </span>
                     </div>
                     {showArchived ? (
                       <div className="test-card-footer">
                         <span style={{ color: '#999', fontSize: '12px' }}>
-                          Архівовано: {test.deletedAt ? new Date(test.deletedAt).toLocaleDateString('uk-UA') : '—'}
+                          {t('testConstructor.archived')} {test.deletedAt ? new Date(test.deletedAt).toLocaleDateString('uk-UA') : '—'}
                         </span>
                       </div>
                     ) : (
@@ -295,7 +295,7 @@ const TestConstructor: React.FC = () => {
                           type="primary"
                           onClick={() => handleExportTest(test.id, test.name)}
                         >
-                          Експортувати тест
+                          {t('testConstructor.exportTest')}
                         </Button>
                       </div>
                     )}
